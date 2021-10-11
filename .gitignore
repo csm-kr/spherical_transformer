@@ -1,0 +1,13 @@
+./datasets/data
+
+./data
+testtest/
+*__pycache__*
+venv/
+*.npy
+*__pycache__*
+venv/
+.idea/
+*.ipynb
+*.yml
+*.yaml
