@@ -2,15 +2,17 @@ import os
 import cv2
 import torch
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
-from utils.visualization_util import show_spheres, grid_2_points
+from samplings.cube_sampling import inflate_cube
+
+from utils.visualization_util import show_spheres
 from utils.mnist_download_util import download_mnist
-from utils.projection_util import get_projection_grid, rotate_grid
+from utils.projection_util import get_projection_grid, cartesian_to_spherical, spherical_to_plane
 from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
 
 
-class Mnist_ERP_Dataset(Dataset):
+class Mnist_Cube_Dataset(Dataset):
 
     training_file = 'training.pt'
     test_file = 'test.pt'
@@ -24,6 +26,7 @@ class Mnist_ERP_Dataset(Dataset):
                  rotate: bool = True,
                  vis: bool = False,
                  bandwidth: int = 30,
+                 num_edge: int = 24,
                  ):
         super().__init__()
 
@@ -40,9 +43,28 @@ class Mnist_ERP_Dataset(Dataset):
         self.data, self.targets = torch.load(os.path.join(os.path.join(root, 'MNIST', 'processed'), data_file))
 
         self.bandwidth = bandwidth
+        self.num_edge = num_edge
         self.rotate = rotate
         self.vis = vis
         self.omni_h = self.omni_w = self.bandwidth * 2
+
+        self.cube_face_list = inflate_cube(num_edge=num_edge)
+        self.cube_mapping_list = []
+
+        # make mapping matrix for cube to
+        # loop cube face (6)
+        for cube_face in self.cube_face_list:
+            num_point = cube_face.shape[0]  # num point, 3
+            cube_sampling_map_x = np.zeros(num_point, dtype=np.float32)
+            cube_sampling_map_y = np.zeros(num_point, dtype=np.float32)
+
+            # each points convert cartesian(x, y, z) to spherical(phi, theta)
+            for n_i in range(num_point):
+                [p, t] = cartesian_to_spherical(cube_face[n_i, 0], cube_face[n_i, 1], cube_face[n_i, 2])
+                y_on_equi, x_on_equi = spherical_to_plane(p, t, self.omni_h, self.omni_w)
+                cube_sampling_map_x[n_i] = x_on_equi
+                cube_sampling_map_y[n_i] = y_on_equi
+            self.cube_mapping_list.append((cube_sampling_map_x, cube_sampling_map_y))
 
     def __getitem__(self, idx):
 
@@ -61,6 +83,7 @@ class Mnist_ERP_Dataset(Dataset):
             # phi = theta = 0
             print(phi, theta)
 
+            # rotation remapping
             R = calculate_Rmatrix_from_phi_theta(phi, theta)
             map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
             img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
@@ -73,34 +96,37 @@ class Mnist_ERP_Dataset(Dataset):
             # map_y = np.load(map_y_path)
             # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
-        # add last channel axis
-        img_np = img_np[:, :, np.newaxis]    # [2 * bandwidth, 2 * bandwidth, 1] [H, W, 1]
+        equi = img_np
+        rotated_equi = equi
+
+        # cube partitioning
+        coordinates = []
+        patch_list = []
+        for coord, maps in zip(self.cube_face_list, self.cube_mapping_list):
+            map_x = maps[0]  # (edge ** 2,)
+            map_y = maps[1]  # (edge ** 2,)
+            bert_input_patch = cv2.remap(rotated_equi, map_x, map_y, cv2.INTER_CUBIC)  # [16, 1]
+            coordinates.append(coord)
+            patch_list.append(bert_input_patch)
+
+        coordinates = np.array(coordinates)
+        patch_list = np.array(patch_list)
 
         if self.vis:
-            if self.rotate:
-                rot = calculate_Rmatrix_from_phi_theta(phi, theta)
-                rotated_grid = rotate_grid(rot, grid)
-            else:
-                rotated_grid = grid
 
-            img_np_vis = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)       # RGB - [H, W, 3]
-            cv2.imshow('rotated_img', img_np_vis)
-            cv2.waitKey(0)
+            print("label : ", int(self.targets[idx]))
+            coordinates_vis = coordinates.reshape(6 * self.num_edge ** 2, -1)  # [6 * self.num_edge ** 2, 3]
+            cal_vis = patch_list.reshape(6 * self.num_edge ** 2, -1)           # [6 * self.num_edge ** 2, 1]
+            show_spheres(scale=2, points=coordinates_vis, rgb=cal_vis)
 
-            rgb = img_np_vis.reshape(-1, 3)                             # [H * W, 3]
-            rotated_points = grid_2_points(grid=rotated_grid)           # tuples -> (num_points, 3)
-            show_spheres(scale=2, points=rotated_points, rgb=rgb)       # points, rgb : (num_points, 3)
-
-        img_np = np.transpose(img_np, (2, 0, 1))                # [3, 224, 224]
-        img_torch = torch.FloatTensor(img_np)                   # [3, 224, 224]
-
+        sequence_tensor = torch.from_numpy(patch_list).type(torch.float32).squeeze(-1)  # [6, num_edge ^ 2]
         label = int(self.targets[idx])
-        return img_torch, label
+        return sequence_tensor, label
 
     def __len__(self):
         return len(self.data)
 
 
 if __name__ == '__main__':
-    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', vis=True)
+    dataset = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', vis=True)
     dataset.__getitem__(0)
