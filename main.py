@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import time
+import visdom
+
 from thop.profile import profile
 
 from datasets.mnist_cube_dataset import Mnist_Cube_Dataset
@@ -15,6 +17,8 @@ LEARNING_RATE = 1e-3
 
 
 def main_wokrer():
+
+    vis = visdom.Visdom(port='8097')
 
     # R / R  - rotate True True
     train_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='train', rotate=True, num_edge=15)
@@ -73,8 +77,18 @@ def main_wokrer():
                                                                                                         toc - tic),
                   end="")
 
+            vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
+                     Y=torch.Tensor([loss]).unsqueeze(0),
+                     update='append',
+                     win='loss',
+                     opts=dict(x_label='step',
+                               y_label='loss',
+                               title='loss',
+                               legend=['total_loss']))
+
         print("")
 
+        val_loss = 0
         correct = 0
         total = 0
         for i, (images, labels) in enumerate(test_loader):
@@ -85,11 +99,26 @@ def main_wokrer():
                 labels = labels.to(DEVICE)
 
                 outputs = model(images)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item()
+
                 _, predicted = torch.max(outputs, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).long().sum().item()
 
-        print('Test Accuracy: {0}'.format(100 * correct / total))
+        accuracy = correct / total
+        val_avg_loss = val_loss / len(test_loader)
+        print('Test Accuracy: {0}'.format(100 * accuracy))
+
+        if vis is not None:
+            vis.line(X=torch.ones((1, 2)) * epoch,
+                     Y=torch.Tensor([accuracy, val_avg_loss]).unsqueeze(0),
+                     update='append',
+                     win='test_loss_acc',
+                     opts=dict(x_label='epoch',
+                               y_label='test_loss and acc',
+                               title='test_loss and accuracy',
+                               legend=['accuracy_top1', 'accuracy_top5', 'avg_loss']))
 
 
 if __name__ == '__main__':
