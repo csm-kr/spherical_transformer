@@ -17,6 +17,7 @@ class ImageNet_ERP_Dataset(ImageFolder):
     def __init__(self,
                  root: str,
                  split: str,
+                 is_minival: bool = False,
                  download: bool = False,
                  rotate: bool = True,
                  vis: bool = False,
@@ -26,6 +27,7 @@ class ImageNet_ERP_Dataset(ImageFolder):
         self.root = root
         assert split in ('train', 'val')
         self.split = split  # training set or test set
+        self.is_minival = is_minival
         self.rotate = rotate
         self.vis = vis
 
@@ -44,6 +46,30 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
         self.phi_fov = 65.5
         self.theta_fov = 65.5
+
+        # make minival samples
+        train_samples = []
+        minival_samples = []
+
+        label_before = -1
+        for i, sample in enumerate(self.samples):
+            label_now = sample[1]
+            if label_before != label_now:
+                # print('label_now : {}, label_before : {}'.format(label_now, label_before))
+                label_before += 1
+                cnt = 0
+            if cnt < 50:
+                minival_samples.append(sample)
+            else:
+                train_samples.append(sample)
+            cnt += 1
+
+        assert len(self.samples) == len(train_samples) + len(minival_samples)
+
+        if self.split == 'train' and self.is_minival:
+            self.samples = minival_samples
+        elif self.split == 'train' and not self.is_minival:
+            self.samples = train_samples
 
 
     @property
@@ -117,5 +143,6 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
 
 if __name__ == '__main__':
-    dataset = ImageNet_ERP_Dataset(root='D:\data\ILSVRC_classification', split='train', vis=True)
-    dataset.__getitem__(0)
+    dataset = ImageNet_ERP_Dataset(root='D:\data\ILSVRC_classification', split='train', is_minival=True, vis=True)
+    print(len(dataset))
+    img, label = dataset.__getitem__(0)
