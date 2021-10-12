@@ -36,6 +36,7 @@ The goal of this tasks is classification of shpere datasets via Spherical transf
 
 ### Model
 
+SPHTransformer
 
 ### Environment
 

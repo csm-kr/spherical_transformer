@@ -59,7 +59,7 @@ class Mnist_ERP_Dataset(Dataset):
             phi = np.random.randint(0, 180)
             theta = np.random.randint(0, 180) * 2
             # phi = theta = 0
-            print(phi, theta)
+            # print(phi, theta)
 
             R = calculate_Rmatrix_from_phi_theta(phi, theta)
             map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
@@ -84,15 +84,15 @@ class Mnist_ERP_Dataset(Dataset):
                 rotated_grid = grid
 
             img_np_vis = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)       # RGB - [H, W, 3]
-            cv2.imshow('rotated_img', img_np_vis)
-            cv2.waitKey(0)
+            # cv2.imshow('rotated_img', img_np_vis)
+            # cv2.waitKey(0)
 
             rgb = img_np_vis.reshape(-1, 3)                             # [H * W, 3]
             rotated_points = grid_2_points(grid=rotated_grid)           # tuples -> (num_points, 3)
             show_spheres(scale=2, points=rotated_points, rgb=rgb)       # points, rgb : (num_points, 3)
 
-        img_np = np.transpose(img_np, (2, 0, 1))                # [3, 224, 224]
-        img_torch = torch.FloatTensor(img_np)                   # [3, 224, 224]
+        img_np = np.transpose(img_np, (2, 0, 1))
+        img_torch = torch.FloatTensor(img_np)                   # [1, 60, 60]
 
         label = int(self.targets[idx])
         return img_torch, label
@@ -102,5 +102,6 @@ class Mnist_ERP_Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', vis=True)
-    dataset.__getitem__(0)
+    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', vis=True, bandwidth=26)
+    img, label = dataset.__getitem__(0)
+    print(img.size())

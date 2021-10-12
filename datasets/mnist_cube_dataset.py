@@ -26,7 +26,7 @@ class Mnist_Cube_Dataset(Dataset):
                  rotate: bool = True,
                  vis: bool = False,
                  bandwidth: int = 30,
-                 num_edge: int = 24,
+                 num_edge: int = 15,
                  ):
         super().__init__()
 
@@ -51,7 +51,7 @@ class Mnist_Cube_Dataset(Dataset):
         self.cube_face_list = inflate_cube(num_edge=num_edge)
         self.cube_mapping_list = []
 
-        # make mapping matrix for cube to
+        # make mapping matrix for cube to erp
         # loop cube face (6)
         for cube_face in self.cube_face_list:
             num_point = cube_face.shape[0]  # num point, 3
@@ -71,9 +71,7 @@ class Mnist_Cube_Dataset(Dataset):
         img = self.data[idx]                                  # tensor
         img_np = img.numpy()
 
-        # D-H ERP
         img_np = cv2.resize(img_np, (self.omni_h, self.omni_w))
-        grid = get_projection_grid(b=self.bandwidth)
 
         if self.rotate:
 
@@ -81,7 +79,7 @@ class Mnist_Cube_Dataset(Dataset):
             phi = np.random.randint(0, 180)
             theta = np.random.randint(0, 180) * 2
             # phi = theta = 0
-            print(phi, theta)
+            # print(phi, theta)
 
             # rotation remapping
             R = calculate_Rmatrix_from_phi_theta(phi, theta)
@@ -128,5 +126,6 @@ class Mnist_Cube_Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', vis=True)
-    dataset.__getitem__(0)
+    dataset = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', vis=True, num_edge=15)
+    seq, label = dataset.__getitem__(0)
+    print(seq.size())
