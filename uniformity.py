@@ -22,7 +22,7 @@ def rand_uniform_hypersphere(N, p):
 
 
 # sampling uniformly from *
-v = rand_uniform_hypersphere(N=10000, p=3)
+v = rand_uniform_hypersphere(N=100000, p=3)
 
 # -------------------- ERP --------------------
 '''

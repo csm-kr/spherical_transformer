@@ -63,7 +63,7 @@ SPHTransformer
 
 ### Quick start
 
-1. run main_vit.py
+1. run main.py
 
 #### Training
 

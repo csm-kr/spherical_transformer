@@ -76,15 +76,15 @@ def main_wokrer():
                                                                                                         lr,
                                                                                                         toc - tic),
                   end="")
-
-            vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
-                     Y=torch.Tensor([loss]).unsqueeze(0),
-                     update='append',
-                     win='loss',
-                     opts=dict(x_label='step',
-                               y_label='loss',
-                               title='loss',
-                               legend=['total_loss']))
+            if i % 10 == 0:
+                vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
+                         Y=torch.Tensor([loss]).unsqueeze(0),
+                         update='append',
+                         win='loss',
+                         opts=dict(x_label='step',
+                                   y_label='loss',
+                                   title='loss',
+                                   legend=['total_loss']))
 
         print("")
 
@@ -108,7 +108,8 @@ def main_wokrer():
 
         accuracy = correct / total
         val_avg_loss = val_loss / len(test_loader)
-        print('Test Accuracy: {0}'.format(100 * accuracy))
+
+        print('Test Accuracy: {:.3f}'.format(100 * accuracy))
 
         if vis is not None:
             vis.line(X=torch.ones((1, 2)) * epoch,
@@ -118,7 +119,7 @@ def main_wokrer():
                      opts=dict(x_label='epoch',
                                y_label='test_loss and acc',
                                title='test_loss and accuracy',
-                               legend=['accuracy_top1', 'accuracy_top5', 'avg_loss']))
+                               legend=['accuracy', 'avg_loss']))
 
 
 if __name__ == '__main__':
