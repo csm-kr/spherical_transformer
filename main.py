@@ -6,8 +6,10 @@ import visdom
 from thop.profile import profile
 
 from datasets.mnist_cube_dataset import Mnist_Cube_Dataset
+from datasets.mnist_erp_dataset import Mnist_ERP_Dataset
 from torch.utils.data import DataLoader
 from models.sphtr import SPHTransformer
+from models.sphtr_erp import SPHTransformer_ERP
 
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -21,8 +23,14 @@ def main_wokrer():
     vis = visdom.Visdom(port='8097')
 
     # R / R  - rotate True True
-    train_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='train', rotate=True, num_edge=15)
-    test_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', rotate=True, num_edge=15)
+
+    # erp
+    train_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='train', rotate=True, bandwidth=25)
+    test_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', rotate=True, bandwidth=25)
+
+    # cube map
+    # train_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='train', rotate=True, num_edge=15)
+    # test_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', rotate=True, num_edge=15)
 
     train_loader = DataLoader(dataset=train_set,
                               batch_size=BATCH_SIZE,
@@ -36,7 +44,8 @@ def main_wokrer():
                              shuffle=False,
                              pin_memory=True)
 
-    model = SPHTransformer(model_dim=32, num_patches=6, num_head=8, num_layers=3, dropout=0.0, num_classes=10, input_dim=225)
+    # model = SPHTransformer(model_dim=32, num_patches=6, num_head=8, num_layers=3, dropout=0.0, num_classes=10, input_dim=225)
+    model = SPHTransformer_ERP(model_dim=32, num_patches=25, num_head=8, num_layers=3, dropout=0.0, num_classes=10, input_dim=225)
     model.to(DEVICE)
 
     criterion = nn.CrossEntropyLoss()

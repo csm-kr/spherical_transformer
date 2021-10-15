@@ -19,6 +19,7 @@ logs/
 pred/
 gt/
 results/
+xy_maps/
 # figure/
 # coco_test_dev/
 .cache_dir/

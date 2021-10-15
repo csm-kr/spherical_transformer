@@ -50,8 +50,9 @@ class Mnist_ERP_Dataset(Dataset):
         img_np = img.numpy()
 
         # D-H ERP
-        img_np = cv2.resize(img_np, (self.omni_h, self.omni_w))
-        grid = get_projection_grid(b=self.bandwidth)
+        img_np = cv2.resize(img_np, (self.omni_w, self.bandwidth))
+        # img_np = cv2.resize(img_np, (self.omni_w, self.omni_h))  # dsize of cv2.resize [width, height]
+        grid = get_projection_grid(b=self.bandwidth, grid_type='ERP')
 
         if self.rotate:
 
@@ -66,17 +67,16 @@ class Mnist_ERP_Dataset(Dataset):
             # 1) create rotation remap
 
             # R = calculate_Rmatrix_from_phi_theta(phi, theta)
-            # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
+            # map_x, map_y = rotate_map_given_R(R, self.bandwidth, self.omni_w)
             # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
             # 2) load rotation remap
 
-            map_matrix_dir = r'C:\\Users\csm81\Desktop\projects_4 (transformer)\\new_20210901_360\\360bert\xy_maps'
+            map_matrix_dir = r'C:\Users\csm81\Desktop\projects_4 (transformer)\spherical_transformer\xy_maps'
             map_x_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_x.npy'
             map_y_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_y.npy'
             map_x = np.load(map_x_path)
             map_y = np.load(map_y_path)
-
             img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
         # add last channel axis
@@ -108,6 +108,6 @@ class Mnist_ERP_Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', vis=True, bandwidth=26)
+    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', vis=True, bandwidth=25)
     img, label = dataset.__getitem__(0)
     print(img.size())
