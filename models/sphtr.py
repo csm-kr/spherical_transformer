@@ -57,7 +57,7 @@ class MultiHeadAttention(nn.Module):
         # x shape is                                     [batch, num_token, model_dim] - [4, 100, 512]
         q = self.W_q(x1)    # [B, 100, 512]
         k = self.W_k(x2)    # [B, 100, 512]
-        v = self.W_k(x3)    # [B, 100, 512]
+        v = self.W_v(x3)    # [B, 100, 512]
 
         if mask is not None:
             mask = mask.unsqueeze(1)                    # [B, 1, 1, 100] for broadcasting.
@@ -141,6 +141,15 @@ class SPHTransformer(nn.Module):
         # number of patches (N)
 
         self.patch_embedding_projection = nn.Linear(input_dim, self.model_dim)
+        # self.patch_embedding_projection = nn.Conv1d(in_channels=input_dim,
+        #                                             out_channels=self.model_dim,
+        #                                             kernel_size=1,
+        #                                             stride=1)
+        # # self.patch_embedding_projection = nn.Conv2d(in_channels=1,
+        # #                                             out_channels=self.model_dim,
+        # #                                             kernel_size=(25, 25),
+        # #                                             stride=(25, 25))
+
         self.position_embedding = nn.Parameter(torch.empty(1, self.num_patches, self.model_dim))  # [1, N, D]
         torch.nn.init.normal_(self.position_embedding, std=.02)  # 확인해보기
 
@@ -148,6 +157,7 @@ class SPHTransformer(nn.Module):
         self.is_classify = is_classify
         if is_classify:
             self.classifier = nn.Linear(self.num_patches * self.model_dim, num_classes)
+            # self.classifier = nn.Linear(self.num_patches, num_classes)
 
         print("num_params : ", self.count_parameters())
 
@@ -160,6 +170,7 @@ class SPHTransformer(nn.Module):
         x += self.position_embedding  # (=E_pos)
         x = self.encoder(x)
         if self.is_classify:
+            # x = torch.mean(x, dim=-1)   # [B, 25]
             x = x.reshape([batch_size, self.model_dim * self.num_patches])
             x = self.classifier(x)
         return x
@@ -167,11 +178,11 @@ class SPHTransformer(nn.Module):
 
 if __name__ == '__main__':
     image = torch.randn([2, 20, 64])
-    vit = SPHTransformer(model_dim=32, num_patches=20, num_classes=10, num_head=8, num_layers=3, input_dim=64)
+    vit = SPHTransformer(model_dim=8, num_patches=20, num_classes=10, num_head=8, num_layers=8, input_dim=64)
     output = vit(image)
     print(output.size())
 
     image = torch.randn([2, 6, 225])
-    vit = SPHTransformer(model_dim=32, num_patches=6, num_classes=10, num_head=8, num_layers=3, input_dim=225)
+    vit = SPHTransformer(model_dim=8, num_patches=6, num_classes=10, num_head=8, num_layers=4, input_dim=225)
     output = vit(image)
     print(output.size())
