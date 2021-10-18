@@ -138,13 +138,18 @@ class SPHTransformer_ERP(nn.Module):
 
         self.model_dim = model_dim
         self.num_patches = num_patches
+        self.input_dim = input_dim
         # number of patches (N)
 
-        # self.patch_embedding_projection = nn.Linear(input_dim, self.model_dim)
-        self.patch_embedding_projection = nn.Conv2d(in_channels=1,
-                                                    out_channels=self.model_dim,
-                                                    kernel_size=(5, 10),
-                                                    stride=(5, 10))
+        self.split_patches = nn.Conv2d(in_channels=1,
+                                       out_channels=1,
+                                       kernel_size=(5, 10),
+                                       stride=(5, 10),
+                                       bias=False)
+        self.split_patches.weight.data.fill_(1.0)
+        self.split_patches.weight.requires_grad = False
+
+        self.patch_embedding_projection = nn.Linear(input_dim, self.model_dim)
 
         self.position_embedding = nn.Parameter(torch.empty(1, self.num_patches, self.model_dim))  # [1, N, D]
         torch.nn.init.normal_(self.position_embedding, std=.02)  # 확인해보기
@@ -159,14 +164,28 @@ class SPHTransformer_ERP(nn.Module):
     def count_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def forward(self, seq):
+    def img2seq(self, img):
+        '''
+        이미지를 patch 로 잘라서 seq로 만드는 부분
+        :param img: [B, C, H, W]
+        :return: [B, len, C]
+        '''
+        seq = []
+        # height
+        for i in range(5):
+            # width
+            for j in range(5):
+                patch = img[:, :, i:i+5, j:j+10]
+                seq.append(patch.reshape(-1, 50))
+
+        return torch.stack(seq, dim=1)
+
+    def forward(self, img):
         # if seq.dim == 4:
         #
-        batch_size = seq.size(0)
-        x = self.patch_embedding_projection(seq)  # [B, 20, 64]  ->  [B, 20, model_dim]
-        # print(x.size())  # torch.Size([2, 32, 5, 5])
-        x = x.permute(0, 2, 3, 1).view(-1, self.num_patches, self.model_dim)  # [B, N, D]
-        # print(x.size())  # torch.Size([2, 25, 32])
+        batch_size = img.size(0)                     # [B, C, H, W]
+        x = self.img2seq(img)                        # [B, patches, input_dim] - [B, 25, 50]
+        x = self.patch_embedding_projection(x)
         x += self.position_embedding  # (=E_pos)
         x = self.encoder(x)
         if self.is_classify:
@@ -177,6 +196,6 @@ class SPHTransformer_ERP(nn.Module):
 
 if __name__ == '__main__':
     image = torch.randn([2, 1, 25, 50])
-    vit = SPHTransformer_ERP(model_dim=32, num_patches=25, num_classes=10, num_head=8, num_layers=3)
+    vit = SPHTransformer_ERP(model_dim=32, num_patches=25, num_classes=10, num_head=8, num_layers=4, input_dim=50)
     output = vit(image)
     print(output.size())
