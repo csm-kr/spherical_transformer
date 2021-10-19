@@ -23,11 +23,12 @@ class Mnist_ERP_Dataset(Dataset):
                  download: bool = False,
                  rotate: bool = True,
                  vis: bool = False,
-                 bandwidth: int = 30,
+                 bandwidth: int = 25,
                  ):
         super().__init__()
 
         self.root = root
+        assert split in ['train', 'test']
         self.split = split  # training set or test set
 
         if download:
@@ -44,58 +45,69 @@ class Mnist_ERP_Dataset(Dataset):
         self.vis = vis
         self.omni_h = self.omni_w = self.bandwidth * 2
 
+        if rotate and split == 'test':
+            # fix for testing
+            np.random.seed(7788)
+            self.test_rot_idx = np.random.choice(50000, 10000)
+
     def __getitem__(self, idx):
 
         img = self.data[idx]                                  # tensor
         img_np = img.numpy()
 
         # D-H ERP
-        img_np = cv2.resize(img_np, (self.omni_w, self.bandwidth))
-        # img_np = cv2.resize(img_np, (self.omni_w, self.omni_h))  # dsize of cv2.resize [width, height]
+        img_np = cv2.resize(img_np, (self.omni_w, self.omni_h))  # dsize of cv2.resize [width, height]
         grid = get_projection_grid(b=self.bandwidth, grid_type='ERP')
 
         if self.rotate:
 
-            # get random rotation (s2 - phi, theta)
-            phi = np.random.randint(0, 180)
-            theta = np.random.randint(0, 180) * 2
-            # phi = theta = 0
-            # print(phi, theta)
+            # get random index at training
+            if self.split == 'train':
+                rot_idx = np.random.randint(0, 50000)
+            # get fixed index at testing
+            elif self.split == 'test':
+                rot_idx = self.test_rot_idx[idx]
 
             # -------------------------------------- choose one method for remap --------------------------------------
+            #  ################### 1) create rotation remap ###################
 
-            # 1) create rotation remap
-
-            # R = calculate_Rmatrix_from_phi_theta(phi, theta)
-            # map_x, map_y = rotate_map_given_R(R, self.bandwidth, self.omni_w)
+            # R = rand_rotation_matrix()
+            # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
             # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
-            # 2) load rotation remap
+            #  ################### 2) load rotation remap ###################
+            now_dir = os.getcwd()
 
-            map_matrix_dir = r'C:\Users\csm81\Desktop\projects_4 (transformer)\spherical_transformer\xy_maps'
-            map_x_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_x.npy'
-            map_y_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_y.npy'
+            # for dataset test
+            map_path_name = 'xy_maps_50000'  # 'xy_maps_50_50'
+            if 'datasets' in now_dir.split('\\'):
+                map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+            # for main
+            else:
+                map_matrix_dir = os.path.join(now_dir, map_path_name)
+
+            map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
+            map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
+
             map_x = np.load(map_x_path)
             map_y = np.load(map_y_path)
             img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
         # add last channel axis
+        img_np = cv2.resize(img_np, (self.bandwidth * 2, self.bandwidth))
         img_np = img_np[:, :, np.newaxis]    # [2 * bandwidth, 2 * bandwidth, 1] [H, W, 1]
+        # cv2.imshow('rotated_img', img_np)
+        # cv2.waitKey(0)
+
+        points = grid_2_points(grid=grid)  # tuples -> (num_points, 3)
 
         if self.vis:
-            if self.rotate:
-                rot = calculate_Rmatrix_from_phi_theta(phi, theta)
-                rotated_grid = rotate_grid(rot, grid)
-            else:
-                rotated_grid = grid
 
-            img_np_vis = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)       # RGB - [H, W, 3]
-            # cv2.imshow('rotated_img', img_np_vis)
-            # cv2.waitKey(0)
-
-            rgb = img_np_vis.reshape(-1, 3)                             # [H * W, 3]
-            rotated_points = grid_2_points(grid=rotated_grid)           # tuples -> (num_points, 3)
-            show_spheres(scale=2, points=rotated_points, rgb=rgb)       # points, rgb : (num_points, 3)
+            img_np_vis = img_np
+            cv2.imshow('rotated_img', img_np_vis)
+            cv2.waitKey(0)
+            rgb = img_np_vis.reshape(-1, 1)                             # [H * W, 3]
+            show_spheres(scale=2, points=points, rgb=rgb)       # points, rgb : (num_points, 3)
 
         img_np = np.transpose(img_np, (2, 0, 1))
         img_torch = torch.FloatTensor(img_np)                   # [1, 60, 60]
@@ -108,6 +120,6 @@ class Mnist_ERP_Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', vis=True, bandwidth=25)
+    dataset = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', rotate=True, vis=True, bandwidth=25)
     img, label = dataset.__getitem__(0)
     print(img.size())

@@ -196,6 +196,6 @@ class SPHTransformer_ERP(nn.Module):
 
 if __name__ == '__main__':
     image = torch.randn([2, 1, 25, 50])
-    vit = SPHTransformer_ERP(model_dim=32, num_patches=25, num_classes=10, num_head=8, num_layers=4, input_dim=50)
+    vit = SPHTransformer_ERP(model_dim=24, num_patches=25, num_classes=10, num_head=8, num_layers=6, input_dim=50)
     output = vit(image)
     print(output.size())

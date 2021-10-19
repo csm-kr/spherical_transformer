@@ -4,13 +4,12 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
-from samplings.cube_sampling import inflate_cube
 from samplings.icosahedron_sampling import inflate_icosahedron
 
 from utils.visualization_util import show_spheres
 from utils.mnist_download_util import download_mnist
 from utils.projection_util import get_projection_grid, cartesian_to_spherical, spherical_to_plane
-from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
+from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R, rand_rotation_matrix
 
 
 class Mnist_Icosa_Dataset(Dataset):
@@ -26,12 +25,13 @@ class Mnist_Icosa_Dataset(Dataset):
                  download: bool = False,
                  rotate: bool = True,
                  vis: bool = False,
-                 bandwidth: int = 30,
+                 bandwidth: int = 25,
                  division_level: int = 3,
                  ):
         super().__init__()
 
         self.root = root
+        assert split in ['train', 'test']
         self.split = split  # training set or test set
 
         if download:
@@ -48,6 +48,11 @@ class Mnist_Icosa_Dataset(Dataset):
         self.rotate = rotate
         self.vis = vis
         self.omni_h = self.omni_w = self.bandwidth * 2
+
+        if rotate and split == 'test':
+            # fix for testing
+            np.random.seed(7788)
+            self.test_rot_idx = np.random.choice(50000, 10000)
 
         self.icosa_face_list = inflate_icosahedron(division_level=division_level)
         self.icosa_mapping_list = []
@@ -73,32 +78,43 @@ class Mnist_Icosa_Dataset(Dataset):
         img_np = img.numpy()
 
         # D-H ERP
-        img_np = cv2.resize(img_np, (self.omni_h, self.omni_w))
+        img_np = cv2.resize(img_np, (self.omni_w, self.omni_h))
 
         if self.rotate:
 
-            # get random rotation (s2 - phi, theta)
-            phi = np.random.randint(0, 180)
-            theta = np.random.randint(0, 180) * 2
+            # get random index at training
+            if self.split == 'train':
+                rot_idx = np.random.randint(0, 50000)
+            # get fixed index at testing
+            elif self.split == 'test':
+                rot_idx = self.test_rot_idx[idx]
+
             # phi = theta = 0
             # print(phi, theta)
 
             # -------------------------------------- choose one method for remap --------------------------------------
+            #  ################### 1) create rotation remap ###################
 
-            # 1) create rotation remap
-
-            # R = calculate_Rmatrix_from_phi_theta(phi, theta)
+            # R = rand_rotation_matrix()
             # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
             # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
-            # 2) load rotation remap
+            #  ################### 2) load rotation remap ###################
+            now_dir = os.getcwd()
 
-            map_matrix_dir = r'C:\\Users\csm81\Desktop\projects_4 (transformer)\\new_20210901_360\\360bert\xy_maps'
-            map_x_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_x.npy'
-            map_y_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_y.npy'
+            # for dataset test
+            map_path_name = 'xy_maps_50000'  # 'xy_maps_50_50'
+            if 'datasets' in now_dir.split('\\'):
+                map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+            # for main
+            else:
+                map_matrix_dir = os.path.join(now_dir, map_path_name)
+
+            map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
+            map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
+
             map_x = np.load(map_x_path)
             map_y = np.load(map_y_path)
-
             img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
         equi = img_np
@@ -133,6 +149,6 @@ class Mnist_Icosa_Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', vis=True, division_level=3)
+    dataset = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True, vis=True, division_level=3)
     seq, label = dataset.__getitem__(0)
     print(seq.size())

@@ -29,6 +29,7 @@ def spherical_to_cartesian(phi, theta):
 
     return [x, y, z]
 
+
 def cartesian_to_spherical(x, y, z):
     # Input:
     #  x,y,z
@@ -55,7 +56,7 @@ def cartesian_to_spherical(x, y, z):
     phi = np.rad2deg(phi)
     theta = np.rad2deg(theta)
 
-    return [phi,theta]
+    return [phi, theta]
 
 
 def rotate_sphere_given_phi_theta_efficient(R, sphere_points):
@@ -94,8 +95,6 @@ def rotate_sphere_given_phi_theta(R, spherePoints):
     return spherePointsRotated
 
 
-
-
 def restore_sphere_given_phi_theta(phi, theta, spherePoints):
     # Input:
     #       phi,theta in degrees and sourceCartCoord(x,y,z of on sphere dimension (height,width,3) )
@@ -120,6 +119,7 @@ def restore_sphere_given_phi_theta(phi, theta, spherePoints):
 
     return spherePointsRotated
 
+
 def sphere_to_flat_efficient(sphere_points, height, width):
     factor_phi = (height - 1) / np.pi
     factor_theta = (width - 1) / (2 * np.pi)
@@ -134,6 +134,7 @@ def sphere_to_flat_efficient(sphere_points, height, width):
     map_x = (theta*factor_theta).astype(np.float32)
 
     return [map_x, map_y]
+
 
 #@jit(nopython=True,cache=True)
 def sphere_to_flat(spherePointsRotated, height, width):
@@ -214,7 +215,6 @@ def sphere_to_flat(spherePointsRotated, height, width):
 #         os.makedirs(SAVE_FILE_PATH)
 #
 #     np.save(SAVE_FILE_PATH + 'pano360_to_cartCoord(' + str(width) + "_" + str(height) + ").npy", save)
-
 
 
 def flat_to_sphere_efficient(height, width):
@@ -302,6 +302,7 @@ def skewSymmetricCrossProduct(v):
     # skewSymmetricMatrix = np.vstack((skewSymmetricMatrix, v_x3))
     return skewSymmetricMatrix
 
+
 #@jit(nopython=True,cache=True)
 def calculate_Rmatrix_from_phi_theta(phi, theta):
     # Inputs:
@@ -351,7 +352,6 @@ def calculate_Rmatrix_from_phi_theta(phi, theta):
     return R
 
 
-
 # @jit(nopython=True,cache=True)
 def compute_R_v1_v2(v1, v2):
     # Inputs:
@@ -391,6 +391,7 @@ def compute_R_v1_v2(v1, v2):
         R = np.identity(3) + skewSymmetric + np.dot(skewSymmetric, skewSymmetric) * (
                     1 / (1 + c))  # what if 1+c is 0?
     return R
+
 
 # @jit(nopython=True,cache=True)
 def rotate_map_given_phi_theta(phi, theta, height, width):
@@ -538,6 +539,7 @@ def rotate_map_given_R_postech(R, height, width):
 
 #@jit(nopython=True,cache=True)
 
+
 def restore_map_given_phi_theta(phi, theta, height, width):
     # Inputs:
     #       phi,theta in degrees , height and width of an image
@@ -583,10 +585,52 @@ def rotate_image_given_phi_theta_efficient(image, phi, theta):
 
 
 def rectify_image_given_phi_theta(image,phi, theta):
-    h,w,c = image.shape
-    [map_x,map_y] = restore_map_given_phi_theta(phi,theta,h,w)
+    h, w, c = image.shape
+    [map_x, map_y] = restore_map_given_phi_theta(phi, theta, h, w)
     rotated_image = cv2.remap(image,map_x,map_y,cv2.INTER_CUBIC,borderMode = cv2.BORDER_TRANSPARENT)
     return rotated_image
+
+
+def rand_rotation_matrix(deflection=1.0, randnums=None):
+    """
+    Creates a random rotation matrix.
+    deflection: the magnitude of the rotation. For 0, no rotation; for 1, competely random
+    rotation. Small deflection => small perturbation.
+    randnums: 3 random numbers in the range [0, 1]. If `None`, they will be auto-generated.
+    # http://blog.lostinmyterminal.com/python/2015/05/12/random-rotation-matrix.html
+    """
+
+    if randnums is None:
+        randnums = np.random.uniform(size=(3,))
+
+    theta, phi, z = randnums
+
+    theta = theta * 2.0*deflection*np.pi  # Rotation about the pole (Z).
+    phi = phi * 2.0*np.pi  # For direction of pole deflection.
+    z = z * 2.0*deflection  # For magnitude of pole deflection.
+
+    # Compute a vector V used for distributing points over the sphere
+    # via the reflection I - V Transpose(V).  This formulation of V
+    # will guarantee that if x[1] and x[2] are uniformly distributed,
+    # the reflected points will be uniform on the sphere.  Note that V
+    # has length sqrt(2) to eliminate the 2 in the Householder matrix.
+
+    r = np.sqrt(z)
+    V = (
+        np.sin(phi) * r,
+        np.cos(phi) * r,
+        np.sqrt(2.0 - z)
+    )
+
+    st = np.sin(theta)
+    ct = np.cos(theta)
+
+    R = np.array(((ct, st, 0), (-st, ct, 0), (0, 0, 1)))
+
+    # Construct the rotation matrix  ( V Transpose(V) - I ) R.
+
+    M = (np.outer(V, V) - np.eye(3)).dot(R)
+    return M
 
 
 if __name__ == "__main__":

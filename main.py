@@ -7,6 +7,8 @@ from thop.profile import profile
 
 from datasets.mnist_cube_dataset import Mnist_Cube_Dataset
 from datasets.mnist_erp_dataset import Mnist_ERP_Dataset
+from datasets.mnist_icosa_dataset import Mnist_Icosa_Dataset
+
 from torch.utils.data import DataLoader
 from models.sphtr import SPHTransformer
 from models.sphtr_erp import SPHTransformer_ERP
@@ -14,8 +16,8 @@ from models.cnn import ConvNet
 
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-NUM_EPOCHS = 200
-BATCH_SIZE = 64
+NUM_EPOCHS = 100
+BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 
 
@@ -25,13 +27,17 @@ def main_wokrer():
 
     # R / R  - rotate True True
 
-    # erp
+    # ---------- erp ----------
     train_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='train', rotate=True, bandwidth=25)
     test_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', rotate=True, bandwidth=25)
 
-    # cube map
-    # train_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='train', rotate=True, num_edge=15)
-    # test_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', rotate=True, num_edge=15)
+    # ---------- cube ----------
+    # train_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, num_edge=15)
+    # test_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, num_edge=15)
+
+    # ---------- icosahedron ----------
+    # train_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, division_level=3)
+    # test_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, division_level=3)
 
     train_loader = DataLoader(dataset=train_set,
                               batch_size=BATCH_SIZE,
@@ -45,14 +51,20 @@ def main_wokrer():
                              shuffle=False,
                              pin_memory=True)
 
-    # transformer
-    # model = SPHTransformer(model_dim=32, num_patches=6, num_head=8, num_layers=3, dropout=0.0, num_classes=10, input_dim=225)
-
-    # erp transformer
-    # model = SPHTransformer_ERP(model_dim=32, num_patches=25, num_head=8, num_layers=3, dropout=0.0, num_classes=10, input_dim=225)
-    
-    # erp cnn
+    # ---------- convolution for erp ----------
     model = ConvNet()
+
+    # ---------- transformer for erp ----------
+    # model = SPHTransformer_ERP(model_dim=24, num_patches=25, num_head=8,
+    #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50)
+
+    # ---------- transformer for cube ----------
+    # model = SPHTransformer(model_dim=24, num_patches=6, num_head=8,
+    #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=225)
+
+    # ---------- transformer for icosahedron ----------
+    # model = SPHTransformer(model_dim=24, num_patches=20, num_head=8,
+    #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=64)
 
     model.to(DEVICE)
 
@@ -85,14 +97,13 @@ def main_wokrer():
 
             # time
             toc = time.time()
-
-            print('\rEpoch [{0}/{1}], Iter [{2}/{3}], Loss: {4:.4f}, LR: {5:.5f}, Time: {6:.2f}'.format(epoch + 1,
-                                                                                                        NUM_EPOCHS, i,
-                                                                                                        len(train_set) // BATCH_SIZE,
-                                                                                                        loss.item(),
-                                                                                                        lr,
-                                                                                                        toc - tic),
-                  end="")
+            # print('\rEpoch [{0}/{1}], Iter [{2}/{3}], Loss: {4:.4f}, LR: {5:.5f}, Time: {6:.2f}'.format(epoch,
+            #                                                                                             NUM_EPOCHS, i,
+            #                                                                                             len(train_set) // BATCH_SIZE,
+            #                                                                                             loss.item(),
+            #                                                                                             lr,
+            #                                                                                             toc - tic),
+            #       end="")
             if i % 10 == 0:
                 vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
                          Y=torch.Tensor([loss]).unsqueeze(0),
@@ -103,7 +114,7 @@ def main_wokrer():
                                    title='loss',
                                    legend=['total_loss']))
 
-        print("")
+        # print("")
 
         val_loss = 0
         correct = 0
@@ -126,7 +137,8 @@ def main_wokrer():
         accuracy = correct / total
         val_avg_loss = val_loss / len(test_loader)
 
-        print('Test Accuracy: {:.3f}'.format(100 * accuracy))
+        # print('Test Accuracy: {:.3f}'.format(100 * accuracy))
+        print(accuracy)
 
         if vis is not None:
             vis.line(X=torch.ones((1, 2)) * epoch,

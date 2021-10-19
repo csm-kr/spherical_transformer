@@ -178,11 +178,11 @@ class SPHTransformer(nn.Module):
 
 if __name__ == '__main__':
     image = torch.randn([2, 20, 64])
-    vit = SPHTransformer(model_dim=8, num_patches=20, num_classes=10, num_head=8, num_layers=8, input_dim=64)
+    vit = SPHTransformer(model_dim=24, num_patches=20, num_classes=10, num_head=8, num_layers=6, input_dim=64)
     output = vit(image)
     print(output.size())
 
     image = torch.randn([2, 6, 225])
-    vit = SPHTransformer(model_dim=8, num_patches=6, num_classes=10, num_head=8, num_layers=4, input_dim=225)
+    vit = SPHTransformer(model_dim=24, num_patches=6, num_classes=10, num_head=8, num_layers=6, input_dim=225)
     output = vit(image)
     print(output.size())
