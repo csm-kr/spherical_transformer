@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 from utils.visualization_util import show_spheres, grid_2_points
-from utils.mnist_download_util import download_mnist
+from utils.download_util import download_mnist
 from utils.projection_util import get_projection_grid, rotate_grid
 from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
 
@@ -79,7 +79,7 @@ class Mnist_ERP_Dataset(Dataset):
             now_dir = os.getcwd()
 
             # for dataset test
-            map_path_name = 'xy_maps_50000'  # 'xy_maps_50_50'
+            map_path_name = 'xy_maps_50000_mnist'  # 'xy_maps_50_50'
             if 'datasets' in now_dir.split('\\'):
                 map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
             # for main

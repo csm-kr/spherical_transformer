@@ -7,7 +7,6 @@ from torchvision.datasets.imagenet import load_meta_file
 from torchvision.datasets.folder import ImageFolder
 
 from utils.visualization_util import show_spheres, grid_2_points
-from utils.mnist_download_util import download_mnist
 from utils.projection_util import get_projection_grid, rotate_grid, make_fov_projection_map
 from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
 
@@ -84,7 +83,22 @@ class ImageNet_ERP_Dataset(ImageFolder):
         img_np = cv2.resize(img_np, (self.omni_h, self.omni_w))
 
         # D-H ERP
-        fov_proj_map_x, fov_proj_map_y, = make_fov_projection_map(self.omni_h, self.omni_w, self.phi_fov, self.theta_fov)
+        # -------------------------------- make fov proj --------------------------------
+        # fov_proj_map_x, fov_proj_map_y, = make_fov_projection_map(self.omni_h, self.omni_w, self.phi_fov, self.theta_fov)
+
+        # -------------------------------- load fov proj --------------------------------
+        now_dir = os.getcwd()
+        map_path_name = 'xy_fov_maps_224'
+        if 'datasets' in now_dir.split('\\'):
+            map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+        else:
+            map_matrix_dir = os.path.join(now_dir, map_path_name)
+
+        map_x_path = map_matrix_dir + '/' + 'x.npy'
+        map_y_path = map_matrix_dir + '/' + 'y.npy'
+        fov_proj_map_x = np.load(map_x_path)
+        fov_proj_map_y = np.load(map_y_path)
+
         undefined_zone = fov_proj_map_y == -1
         OMNI_H, OMNI_W = fov_proj_map_x.shape
         img_np = cv2.remap(img_np, fov_proj_map_x, fov_proj_map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)

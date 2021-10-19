@@ -52,11 +52,11 @@ def main_wokrer():
                              pin_memory=True)
 
     # ---------- convolution for erp ----------
-    model = ConvNet()
+    # model = ConvNet()
 
     # ---------- transformer for erp ----------
-    # model = SPHTransformer_ERP(model_dim=24, num_patches=25, num_head=8,
-    #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50)
+    model = SPHTransformer_ERP(model_dim=24, num_patches=25, num_head=8,
+                               num_layers=6, dropout=0.0, num_classes=10, input_dim=50)
 
     # ---------- transformer for cube ----------
     # model = SPHTransformer(model_dim=24, num_patches=6, num_head=8,
