@@ -11,6 +11,10 @@ figure/others
 # download
 *.tmp
 
+# numpy
+*.npy
+*/*.npy
+
 # train
 voc/
 save/
