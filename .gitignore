@@ -20,6 +20,7 @@ pred/
 gt/
 results/
 xy_maps/
+xy_maps_50000/
 # figure/
 # coco_test_dev/
 .cache_dir/
