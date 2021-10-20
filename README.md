@@ -14,6 +14,12 @@ The goal of this tasks is classification of shpere datasets via Spherical transf
 - [x] mnist_cube_dataset
 - [x] mnist_erp_dataset
 
+##### CIFAR
+
+- [ ] cifar_icosa_dataset
+- [x] cifar_cube_dataset
+- [x] cifar_erp_dataset
+
 ##### IMAGENET
 
 - [ ] imagenet_icosa_dataset
