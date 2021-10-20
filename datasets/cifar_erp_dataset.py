@@ -13,7 +13,7 @@ from utils.projection_util import get_projection_grid, rotate_grid
 from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
 
 
-class Mnist_ERP_Dataset(Dataset):
+class Cifar_ERP_Dataset(Dataset):
 
 
     train_list = [
@@ -112,15 +112,15 @@ class Mnist_ERP_Dataset(Dataset):
     def __getitem__(self, idx):
 
         img = self.data[idx]                                  # tensor
-        print(self.targets[idx])
+        # print(self.targets[idx])
         img_np = img
         img_np = cv2.resize(img_np, (self.omni_w, self.omni_h))  # dsize of cv2.resize [width, height]
-        cv2.imshow('rotated_img', img_np)
-        cv2.waitKey(0)
+        # cv2.imshow('rotated_img', img_np)
+        # cv2.waitKey(0)
 
         # -------------------------------- load fov proj --------------------------------
         now_dir = os.getcwd()
-        map_path_name = 'xy_fov_maps_50'
+        map_path_name = 'xy_fov_maps_100'
         if 'datasets' in now_dir.split('\\'):
             map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
         else:
@@ -193,6 +193,6 @@ class Mnist_ERP_Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = Mnist_ERP_Dataset(root='D:\data\CIFAR10', split='test', rotate=False, vis=True, bandwidth=50)
+    dataset = Cifar_ERP_Dataset(root='D:\data\CIFAR10', split='test', rotate=True, vis=True, bandwidth=50)
     img, label = dataset.__getitem__(0)
     print(img.size())
