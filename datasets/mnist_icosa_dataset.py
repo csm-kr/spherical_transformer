@@ -120,7 +120,7 @@ class Mnist_Icosa_Dataset(Dataset):
         equi = img_np
         rotated_equi = equi
 
-        # cube partitioning
+        # icosa partitioning
         coordinates = []
         patch_list = []
         for coord, maps in zip(self.icosa_face_list, self.icosa_mapping_list):
