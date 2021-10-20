@@ -5,9 +5,14 @@ import visdom
 
 from thop.profile import profile
 
+# MNIST
 from datasets.mnist_cube_dataset import Mnist_Cube_Dataset
 from datasets.mnist_erp_dataset import Mnist_ERP_Dataset
 from datasets.mnist_icosa_dataset import Mnist_Icosa_Dataset
+
+# CIFAR
+from datasets.cifar_erp_dataset import Cifar_ERP_Dataset
+from datasets.cifar_cube_dataset import Cifar_Cube_Dataset
 
 from torch.utils.data import DataLoader
 from models.sphtr import SPHTransformer
@@ -27,9 +32,10 @@ def main_wokrer():
 
     # R / R  - rotate True True
 
+    ############################## MNIST ##############################
     # ---------- erp ----------
-    train_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='train', rotate=True, bandwidth=25)
-    test_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', rotate=True, bandwidth=25)
+    # train_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='train', rotate=True, bandwidth=25)
+    # test_set = Mnist_ERP_Dataset(root='D:\data\MNIST', split='test', rotate=True, bandwidth=25)
 
     # ---------- cube ----------
     # train_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, num_edge=15)
@@ -38,6 +44,15 @@ def main_wokrer():
     # ---------- icosahedron ----------
     # train_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, division_level=3)
     # test_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, division_level=3)
+
+    ############################## CIFAR ##############################
+    # ---------- erp ----------
+    # train_set = Cifar_ERP_Dataset(root='D:\data\CIFAR10', split='train', rotate=True, bandwidth=50)
+    # test_set = Cifar_ERP_Dataset(root='D:\data\CIFAR10', split='test', rotate=True, bandwidth=50)
+
+    # ---------- cube ----------
+    train_set = Cifar_Cube_Dataset(root='D:\data\CIFAR10', split='train', rotate=True, bandwidth=50, num_edge=29)
+    test_set = Cifar_Cube_Dataset(root='D:\data\CIFAR10', split='test', rotate=True, bandwidth=50, num_edge=29)
 
     train_loader = DataLoader(dataset=train_set,
                               batch_size=BATCH_SIZE,
@@ -55,16 +70,23 @@ def main_wokrer():
     # model = ConvNet()
 
     # ---------- transformer for erp ----------
-    model = SPHTransformer_ERP(model_dim=24, num_patches=25, num_head=8,
-                               num_layers=6, dropout=0.0, num_classes=10, input_dim=50)
+    # model = SPHTransformer_ERP(model_dim=24, num_patches=25, num_head=8,
+    #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50)
+    #
+    # model = SPHTransformer_ERP(model_dim=24, num_patches=100, num_head=8,
+    #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50 * 3)
 
     # ---------- transformer for cube ----------
     # model = SPHTransformer(model_dim=24, num_patches=6, num_head=8,
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=225)
+    model = SPHTransformer(model_dim=24, num_patches=6, num_head=8,
+                           num_layers=6, dropout=0.0, num_classes=10, input_dim=841 * 3)
 
     # ---------- transformer for icosahedron ----------
     # model = SPHTransformer(model_dim=24, num_patches=20, num_head=8,
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=64)
+    # model = SPHTransformer(model_dim=24, num_patches=20, num_head=8,
+    #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=256 * 3)
 
     model.to(DEVICE)
 

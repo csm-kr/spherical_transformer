@@ -140,15 +140,6 @@ class SPHTransformer_ERP(nn.Module):
         self.num_patches = num_patches
         self.input_dim = input_dim
         # number of patches (N)
-
-        self.split_patches = nn.Conv2d(in_channels=1,
-                                       out_channels=1,
-                                       kernel_size=(5, 10),
-                                       stride=(5, 10),
-                                       bias=False)
-        self.split_patches.weight.data.fill_(1.0)
-        self.split_patches.weight.requires_grad = False
-
         self.patch_embedding_projection = nn.Linear(input_dim, self.model_dim)
 
         self.position_embedding = nn.Parameter(torch.empty(1, self.num_patches, self.model_dim))  # [1, N, D]
@@ -164,7 +155,7 @@ class SPHTransformer_ERP(nn.Module):
     def count_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def img2seq(self, img):
+    def img2seq(self, img, length, input_dim):
         '''
         이미지를 patch 로 잘라서 seq로 만드는 부분
         :param img: [B, C, H, W]
@@ -172,11 +163,11 @@ class SPHTransformer_ERP(nn.Module):
         '''
         seq = []
         # height
-        for i in range(5):
+        for i in range(length):
             # width
-            for j in range(5):
+            for j in range(length):
                 patch = img[:, :, i:i+5, j:j+10]
-                seq.append(patch.reshape(-1, 50))
+                seq.append(patch.reshape(-1, input_dim))
 
         return torch.stack(seq, dim=1)
 
@@ -184,7 +175,7 @@ class SPHTransformer_ERP(nn.Module):
         # if seq.dim == 4:
         #
         batch_size = img.size(0)                     # [B, C, H, W]
-        x = self.img2seq(img)                        # [B, patches, input_dim] - [B, 25, 50]
+        x = self.img2seq(img, int(math.sqrt(self.num_patches)), self.input_dim)                        # [B, patches, input_dim] - [B, 25, 50]
         x = self.patch_embedding_projection(x)
         x += self.position_embedding  # (=E_pos)
         x = self.encoder(x)
@@ -196,6 +187,7 @@ class SPHTransformer_ERP(nn.Module):
 
 if __name__ == '__main__':
     image = torch.randn([2, 1, 25, 50])
-    vit = SPHTransformer_ERP(model_dim=24, num_patches=25, num_classes=10, num_head=8, num_layers=6, input_dim=50)
+    image = torch.randn([2, 3, 50, 100])
+    vit = SPHTransformer_ERP(model_dim=24, num_patches=100, num_classes=10, num_head=8, num_layers=6, input_dim=50)
     output = vit(image)
     print(output.size())
