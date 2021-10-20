@@ -186,3 +186,8 @@ if __name__ == '__main__':
     vit = SPHTransformer(model_dim=24, num_patches=6, num_classes=10, num_head=8, num_layers=6, input_dim=225)
     output = vit(image)
     print(output.size())
+
+    image = torch.randn([2, 6, 841])
+    vit = SPHTransformer(model_dim=24, num_patches=6, num_classes=10, num_head=8, num_layers=6, input_dim=841)
+    output = vit(image)
+    print(output.size())
