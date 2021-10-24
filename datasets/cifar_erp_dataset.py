@@ -177,8 +177,8 @@ class Cifar_ERP_Dataset(Dataset):
         if self.vis:
 
             img_np_vis = img_np
-            cv2.imshow('rotated_img', img_np_vis)
-            cv2.waitKey(0)
+            # cv2.imshow('rotated_img', img_np_vis)
+            # cv2.waitKey(0)
             rgb = img_np_vis.reshape(-1, 3)                             # [H * W, 3]
             show_spheres(scale=2, points=points, rgb=rgb)       # points, rgb : (num_points, 3)
 

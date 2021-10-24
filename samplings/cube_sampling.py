@@ -163,6 +163,6 @@ if __name__ == '__main__':
     # vis points
     visualize_points(points)
 
-    patch_list = inflate_cube(num_edge=10)  # this
+    patch_list = inflate_cube(num_edge=58)  # this
     visualize_face(patch_list)
 

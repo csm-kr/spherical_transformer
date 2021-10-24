@@ -262,7 +262,7 @@ def flat_to_sphere(height, width):
     for x in range(0, width):
         x_to_theta[x] = np.rad2deg(np.multiply(x,theta_slope))
 
-    for y in range(0,height):
+    for y in range(0, height):
         y_to_phi[y] = np.rad2deg(np.multiply(y,phi_slope))
 
 
@@ -443,6 +443,30 @@ def rotate_map_given_phi_theta_efficient(phi, theta, height, width):
     [map_x,map_y] = sphere_to_flat_efficient(spherePointsRotated,height,width)
 
     # dst(y,x) = src(map_x(y,x),map_y(y,x))
+    return [map_x, map_y]
+
+
+def rotate_map_given_R_efficient(R, height, width):
+    # Inputs:
+    #       phi,theta in degrees , height and width of an image
+    # output:
+    #       rotation map for x and y coordinate
+    # goal:
+    #       calculating rotation map for corresponding image dimension and phi,theta value.
+    #       (1,0,0)(rho,phi,theta) on sphere goes to (1,phi,theta)
+
+    # if not original_file.is_file():
+    # step1
+    spherePoints = flat_to_sphere_efficient(height, width)
+    # R = calculate_Rmatrix_from_phi_theta(phi,theta)
+    R_inv = inv(R)
+    #step2
+    spherePointsRotated = rotate_sphere_given_phi_theta_efficient(R_inv, spherePoints)
+
+    #Create two mapping variable
+    #step3
+    [map_x, map_y] = sphere_to_flat_efficient(spherePointsRotated, height, width)
+
     return [map_x, map_y]
 
 

@@ -141,14 +141,6 @@ class SPHTransformer(nn.Module):
         # number of patches (N)
 
         self.patch_embedding_projection = nn.Linear(input_dim, self.model_dim)
-        # self.patch_embedding_projection = nn.Conv1d(in_channels=input_dim,
-        #                                             out_channels=self.model_dim,
-        #                                             kernel_size=1,
-        #                                             stride=1)
-        # # self.patch_embedding_projection = nn.Conv2d(in_channels=1,
-        # #                                             out_channels=self.model_dim,
-        # #                                             kernel_size=(25, 25),
-        # #                                             stride=(25, 25))
 
         self.position_embedding = nn.Parameter(torch.empty(1, self.num_patches, self.model_dim))  # [1, N, D]
         torch.nn.init.normal_(self.position_embedding, std=.02)  # 확인해보기
@@ -177,8 +169,13 @@ class SPHTransformer(nn.Module):
 
 
 if __name__ == '__main__':
-    image = torch.randn([2, 20, 64])
+    image = torch.randn([2, 20, 64]) # mnist icosahedron
     vit = SPHTransformer(model_dim=24, num_patches=20, num_classes=10, num_head=8, num_layers=6, input_dim=64)
+    output = vit(image)
+    print(output.size())
+
+    image = torch.randn([2, 20, 256 * 3])
+    vit = SPHTransformer(model_dim=64, num_patches=20, num_classes=10, num_head=8, num_layers=12, input_dim=256 * 3)
     output = vit(image)
     print(output.size())
 
@@ -187,7 +184,7 @@ if __name__ == '__main__':
     output = vit(image)
     print(output.size())
 
-    image = torch.randn([2, 6, 841])
-    vit = SPHTransformer(model_dim=24, num_patches=6, num_classes=10, num_head=8, num_layers=6, input_dim=841)
+    image = torch.randn([2, 6, 841 * 3])
+    vit = SPHTransformer(model_dim=64, num_patches=6, num_classes=10, num_head=8, num_layers=12, input_dim=841 * 3)
     output = vit(image)
     print(output.size())

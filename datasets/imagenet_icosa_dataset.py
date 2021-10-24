@@ -7,13 +7,13 @@ from torchvision.datasets.imagenet import load_meta_file
 from torchvision.datasets.folder import ImageFolder
 
 from samplings.cube_sampling import inflate_cube
+from samplings.icosahedron_sampling import inflate_icosahedron
 
-from samplings.cube_sampling import inflate_cube
 from utils.visualization_util import show_spheres, grid_2_points
 from utils.projection_util import get_projection_grid, rotate_grid, cartesian_to_spherical, spherical_to_plane, make_fov_projection_map
 
 
-class ImageNet_Cube_Dataset(ImageFolder):
+class ImageNet_Icosa_Dataset(ImageFolder):
 
     def __init__(self,
                  root: str,
@@ -23,7 +23,7 @@ class ImageNet_Cube_Dataset(ImageFolder):
                  rotate: bool = True,
                  vis: bool = False,
                  bandwidth: int = 100,
-                 num_edge: int = 58
+                 division_level: int = 58
                  ):
 
         self.root = root
@@ -33,7 +33,7 @@ class ImageNet_Cube_Dataset(ImageFolder):
 
         wnid_to_classes = load_meta_file(self.root)[0]
 
-        super(ImageNet_Cube_Dataset, self).__init__(self.split_folder)
+        super(ImageNet_Icosa_Dataset, self).__init__(self.split_folder)
         self.wnids = self.classes
         self.wnid_to_idx = self.class_to_idx
         self.classes = [wnid_to_classes[wnid] for wnid in self.wnids]
@@ -42,7 +42,7 @@ class ImageNet_Cube_Dataset(ImageFolder):
                              for cls in clss}
 
         self.bandwidth = bandwidth
-        self.num_edge = num_edge
+        self.division_level = division_level
         self.rotate = rotate
         self.vis = vis
         self.omni_h = self.omni_w = self.bandwidth * 2
@@ -84,23 +84,23 @@ class ImageNet_Cube_Dataset(ImageFolder):
         elif self.split == 'train' and not self.is_minival:
             self.samples = train_samples
 
-        self.cube_face_list = inflate_cube(num_edge=num_edge)
+        self.cube_face_list = inflate_icosahedron(division_level=division_level)
         self.cube_mapping_list = []
 
-        # make mapping matrix for cube to erp
-        # loop cube face (6)
-        for cube_face in self.cube_face_list:
-            num_point = cube_face.shape[0]  # num point, 3
-            cube_sampling_map_x = np.zeros(num_point, dtype=np.float32)
-            cube_sampling_map_y = np.zeros(num_point, dtype=np.float32)
+        # make mapping matrix for icosahedron to erp
+        # loop cube face (20)
+        for icosa_face in self.icosa_face_list:
+            num_point = icosa_face.shape[0]  # num point, 3
+            icosa_sampling_map_x = np.zeros(num_point, dtype=np.float32)
+            icosa_sampling_map_y = np.zeros(num_point, dtype=np.float32)
 
             # each points convert cartesian(x, y, z) to spherical(phi, theta)
             for n_i in range(num_point):
-                [p, t] = cartesian_to_spherical(cube_face[n_i, 0], cube_face[n_i, 1], cube_face[n_i, 2])
+                [p, t] = cartesian_to_spherical(icosa_face[n_i, 0], icosa_face[n_i, 1], icosa_face[n_i, 2])
                 y_on_equi, x_on_equi = spherical_to_plane(p, t, self.omni_h * 3, self.omni_w * 3)
-                cube_sampling_map_x[n_i] = x_on_equi
-                cube_sampling_map_y[n_i] = y_on_equi
-            self.cube_mapping_list.append((cube_sampling_map_x, cube_sampling_map_y))
+                icosa_sampling_map_x[n_i] = x_on_equi
+                icosa_sampling_map_y[n_i] = y_on_equi
+            self.icosa_mapping_list.append((icosa_sampling_map_x, icosa_sampling_map_y))
 
 
     @property
@@ -164,14 +164,10 @@ class ImageNet_Cube_Dataset(ImageFolder):
         equi = img_np
         rotated_equi = equi
 
-        # rotated_equi = cv2.resize(rotated_equi, (self.omni_h, self.omni_w))  # [600, 600]
-        # cv2.imshow('input', rotated_equi)
-        # cv2.waitKey(0)
-
-        # cube partitioning
+        # icosa partitioning
         coordinates = []
         patch_list = []
-        for coord, maps in zip(self.cube_face_list, self.cube_mapping_list):
+        for coord, maps in zip(self.icosa_face_list, self.icosa_mapping_list):
             map_x = maps[0]  # (edge ** 2,)
             map_y = maps[1]  # (edge ** 2,)
             bert_input_patch = cv2.remap(rotated_equi, map_x, map_y, cv2.INTER_CUBIC)  # [16, 1]
@@ -183,21 +179,23 @@ class ImageNet_Cube_Dataset(ImageFolder):
 
         if self.vis:
             print("label : ", int(self.targets[idx]))
-            coordinates_vis = coordinates.reshape(6 * self.num_edge ** 2, -1)  # [6 * self.num_edge ** 2, 3]
-            cal_vis = patch_list.reshape(6 * self.num_edge ** 2, -1)  # [6 * self.num_edge ** 2, 3]
+            coordinates_vis = coordinates.reshape(20 * 4 ** self.division_level,
+                                                  -1)  # [20 * 4 ** self.division_level, 3]
+            cal_vis = patch_list.reshape(20 * 4 ** self.division_level, -1)  # [20 * 4 ** self.division_level, 1]
             show_spheres(scale=2, points=coordinates_vis, rgb=cal_vis)
 
-        sequence_tensor = torch.from_numpy(patch_list).type(torch.float32).squeeze(-1)  # [6, num_edge ^ 2]
-        sequence_tensor = sequence_tensor.reshape(6, -1)
+        sequence_tensor = torch.from_numpy(patch_list).type(torch.float32).squeeze(-1)  # [20, 4 ** self.division_level]
+        sequence_tensor = sequence_tensor.reshape(20, -1)
         label = int(self.targets[idx])
         return sequence_tensor, label
+
 
     def __len__(self):
         return len(self.samples)
 
 
 if __name__ == '__main__':
-    dataset = ImageNet_Cube_Dataset(root='D:\data\ILSVRC_classification', split='val', rotate=True, vis=True)
+    dataset = ImageNet_Icosa_Dataset(root='D:\data\ILSVRC_classification', split='val', rotate=True, vis=True)
     print(len(dataset))
     img, label = dataset.__getitem__(0)
     print(img.shape)

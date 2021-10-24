@@ -20,7 +20,7 @@ class ImageNet_ERP_Dataset(ImageFolder):
                  download: bool = False,
                  rotate: bool = True,
                  vis: bool = False,
-                 bandwidth: int = 112,
+                 bandwidth: int = 100,
                  ):
 
         self.root = root
@@ -45,6 +45,16 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
         self.phi_fov = 65.5
         self.theta_fov = 65.5
+        self.fov_proj_map_x, self.fov_proj_map_y = \
+            make_fov_projection_map(self.omni_h, self.omni_w, self.phi_fov, self.theta_fov)
+
+        if rotate and split == 'val':
+            # fix for testing
+            np.random.seed(7788)
+            # 50000 개 중에 50000 개
+            num_rotations = 50000
+            num_val_img = 50000
+            self.test_rot_idx = np.random.choice(num_rotations, num_val_img)
 
         # make minival samples
         train_samples = []
@@ -84,70 +94,84 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
         # D-H ERP
         # -------------------------------- make fov proj --------------------------------
-        # fov_proj_map_x, fov_proj_map_y, = make_fov_projection_map(self.omni_h, self.omni_w, self.phi_fov, self.theta_fov)
+        # fov_proj_map_x, fov_proj_map_y, = make_fov_projection_map(self.omni_h * 3, self.omni_w * 3, self.phi_fov, self.theta_fov)
 
         # -------------------------------- load fov proj --------------------------------
-        now_dir = os.getcwd()
-        map_path_name = 'xy_fov_maps_224'
-        if 'datasets' in now_dir.split('\\'):
-            map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
-        else:
-            map_matrix_dir = os.path.join(now_dir, map_path_name)
+        # now_dir = os.getcwd()
+        # # map_path_name = 'xy_fov_maps_200'
+        # map_path_name = r'D:\data\\xy_maps_50000_image_600'
+        # if 'datasets' in now_dir.split('\\'):
+        #     map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+        # else:
+        #     map_matrix_dir = os.path.join(now_dir, map_path_name)
+        #
+        # map_x_path = map_matrix_dir + '/' + 'x.npy'
+        # map_y_path = map_matrix_dir + '/' + 'y.npy'
+        # fov_proj_map_x = np.load(map_x_path)
+        # fov_proj_map_y = np.load(map_y_path)
 
-        map_x_path = map_matrix_dir + '/' + 'x.npy'
-        map_y_path = map_matrix_dir + '/' + 'y.npy'
-        fov_proj_map_x = np.load(map_x_path)
-        fov_proj_map_y = np.load(map_y_path)
+        fov_proj_map_x = self.fov_proj_map_x
+        fov_proj_map_y = self.fov_proj_map_y
 
         undefined_zone = fov_proj_map_y == -1
         OMNI_H, OMNI_W = fov_proj_map_x.shape
-        img_np = cv2.remap(img_np, fov_proj_map_x, fov_proj_map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+        img_np = cv2.remap(img_np, fov_proj_map_x, fov_proj_map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)   # [600, 600]
         img_np[undefined_zone] = 0
 
-        img_np = cv2.resize(img_np, (self.omni_h, self.omni_w))
-        grid = get_projection_grid(b=self.bandwidth)
+        # for erp projection sampling -> resize
+        img_np = cv2.resize(img_np, (self.omni_h * 3, self.omni_w * 3))
 
         if self.rotate:
-            # get random rotation (s2 - phi, theta)
-            phi = np.random.randint(0, 180)
-            theta = np.random.randint(0, 180) * 2
-            # phi = theta = 0
-            print(phi, theta)
+            # get random index at training
+            if self.split == 'train':
+                rot_idx = np.random.randint(0, 50000)
+            # get fixed index at testing
+            elif self.split == 'val':
+                rot_idx = self.test_rot_idx[idx]
 
-            # from scratch
-            R = calculate_Rmatrix_from_phi_theta(phi, theta)
-            map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
-            img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
-            # cv2.imshow('rotated_img', img_np)
-            # cv2.waitKey(0)
+            # -------------------------------------- choose one method for remap --------------------------------------
+            #  ################### 1) create rotation remap ###################
 
-            # map_matrix_dir = '../xy_maps/'
-            # map_matrix_dir = r'C:\\Users\csm81\Desktop\projects_4 (transformer)\\new_20210901_360\\360bert\xy_maps'
-            # map_x_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_x.npy'
-            # map_y_path = map_matrix_dir + '/' + str('%03d' % phi) + '_' + str('%03d' % theta) + '_y.npy'
-            # map_x = np.load(map_x_path)
-            # map_y = np.load(map_y_path)
+            # R = rand_rotation_matrix()
+            # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
             # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
+            #  ################### 2) load rotation remap ###################
+            now_dir = os.getcwd()
+
+            # for dataset test
+            # map_path_name = 'xy_maps_50000_mnist'  # 'xy_maps_50_50'
+            map_path_name = r'D:\data\\xy_maps_50000_image_600'  # 'xy_maps_50_50'
+            if 'datasets' in now_dir.split('\\'):
+                map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+            # for main
+            else:
+                map_matrix_dir = os.path.join(now_dir, map_path_name)
+
+            map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
+            map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
+
+            map_x = np.load(map_x_path)
+            map_y = np.load(map_y_path)
+            img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+
         # add last channel axis
-        # img_np = img_np[:, :, np.newaxis]  # [2 * bandwidth, 2 * bandwidth, 1] [H, W, 1]
+        img_np = cv2.resize(img_np, (self.bandwidth * 2, self.bandwidth))
 
         if self.vis:
-            if self.rotate:
-                rot = calculate_Rmatrix_from_phi_theta(phi, theta)
-                rotated_grid = rotate_grid(rot, grid)
-            else:
-                rotated_grid = grid
+
+            grid = get_projection_grid(b=self.bandwidth, grid_type='ERP')
+            points = grid_2_points(grid=grid)  # tuples -> (num_points, 3)
 
             img_np_vis = img_np
-            # cv2.imshow('rotated_img', img_np_vis)
-            # cv2.waitKey(0)
-            rgb = img_np_vis.reshape(-1, 3)  # [H * W, 3]
-            rotated_points = grid_2_points(grid=rotated_grid)  # tuples -> (num_points, 3)
-            show_spheres(scale=2, points=rotated_points, rgb=rgb)  # points, rgb : (num_points, 3)
+            cv2.imshow('rotated_img', img_np_vis)
+            cv2.waitKey(0)
+            rgb = img_np_vis.reshape(-1, 3)                             # [H * W, 3]
 
-        img_np = np.transpose(img_np, (2, 0, 1))  # [3, 224, 224]
-        img_torch = torch.FloatTensor(img_np)  # [3, 224, 224]
+            show_spheres(scale=2, points=points, rgb=rgb)       # points, rgb : (num_points, 3)
+
+        img_np = np.transpose(img_np, (2, 0, 1)).astype(np.float32) / 255          # [0 ~ 1]
+        img_torch = torch.FloatTensor(img_np)                   # [1, 60, 60]
 
         label = int(self.targets[idx])
         return img_torch, label
@@ -157,6 +181,6 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
 
 if __name__ == '__main__':
-    dataset = ImageNet_ERP_Dataset(root='D:\data\ILSVRC_classification', split='train', is_minival=True, vis=True)
+    dataset = ImageNet_ERP_Dataset(root='D:\data\ILSVRC_classification', split='val', rotate=True, vis=True)
     print(len(dataset))
-    img, label = dataset.__getitem__(0)
+    img, label = dataset.__getitem__(11)
