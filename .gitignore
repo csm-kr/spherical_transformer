@@ -25,6 +25,7 @@ gt/
 results/
 xy_maps/
 xy_maps_50000/
+xy_maps_50000_image/
 # figure/
 # coco_test_dev/
 .cache_dir/
