@@ -2,44 +2,46 @@ import os
 import cv2
 import torch
 import numpy as np
+import glob
+
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets.imagenet import load_meta_file
 from torchvision.datasets.folder import ImageFolder
 
+
 from samplings.cube_sampling import inflate_cube
 from samplings.icosahedron_sampling import inflate_icosahedron
-
 from utils.visualization_util import show_spheres, grid_2_points
 from utils.projection_util import get_projection_grid, rotate_grid, cartesian_to_spherical, spherical_to_plane, make_fov_projection_map
+from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
 
 
-class ImageNet_Icosa_Dataset(ImageFolder):
+class Panoramic_Icosa_Dataset(Dataset):
+
+    class_names = ('bathroom', 'beach', 'bedroom', 'cave', 'forest',
+                   'mountain', 'ruin', 'swimming_pool', 'theater', 'train')
+    class_names = sorted(class_names)
 
     def __init__(self,
                  root: str,
                  split: str,
-                 is_minival: bool = False,
                  download: bool = False,
                  rotate: bool = True,
                  vis: bool = False,
                  bandwidth: int = 100,
-                 division_level: int = 58
+                 division_level: int = 5
                  ):
 
+        super().__init__()
+
         self.root = root
-        assert split in ('train', 'val')
+        assert split in ('train', 'test')
         self.split = split  # training set or test set
-        self.is_minival = is_minival
+        self.rotate = rotate
+        self.vis = vis
 
-        wnid_to_classes = load_meta_file(self.root)[0]
-
-        super(ImageNet_Icosa_Dataset, self).__init__(self.split_folder)
-        self.wnids = self.classes
-        self.wnid_to_idx = self.class_to_idx
-        self.classes = [wnid_to_classes[wnid] for wnid in self.wnids]
-        self.class_to_idx = {cls: idx
-                             for idx, clss in enumerate(self.classes)
-                             for cls in clss}
+        self.class_dict = {class_name: i for i, class_name in enumerate(self.class_names)}
+        self.class_dict_inv = {i: class_name for i, class_name in enumerate(self.class_names)}
 
         self.bandwidth = bandwidth
         self.division_level = division_level
@@ -47,42 +49,27 @@ class ImageNet_Icosa_Dataset(ImageFolder):
         self.vis = vis
         self.omni_h = self.omni_w = self.bandwidth * 2
 
-        self.phi_fov = 65.5
-        self.theta_fov = 65.5
-        self.fov_proj_map_x, self.fov_proj_map_y = \
-            make_fov_projection_map(self.omni_h, self.omni_w, self.phi_fov, self.theta_fov)
+        train_path = []
+        test_path = []
+        for class_name in self.class_names:
+            img_list = glob.glob(os.path.join(root, class_name) + '/*.jpg')
 
-        if rotate and split == 'val':
-            # fix for testing
-            np.random.seed(7788)
-            # 50000 개 중에 50000 개
-            num_rotations = 50000
-            num_val_img = 50000
-            self.test_rot_idx = np.random.choice(num_rotations, num_val_img)
+            num_train_data = int(0.8 * len(img_list))
 
-        # make minival samples
-        train_samples = []
-        minival_samples = []
+            np.random.seed(1)
+            train_indices = sorted(np.random.choice(len(img_list), num_train_data, replace=False))
+            test_indices = sorted(list(set(np.arange(len(img_list))) - set(train_indices)))
 
-        label_before = -1
-        for i, sample in enumerate(self.samples):
-            label_now = sample[1]
-            if label_before != label_now:
-                # print('label_now : {}, label_before : {}'.format(label_now, label_before))
-                label_before += 1
-                cnt = 0
-            if cnt < 50:
-                minival_samples.append(sample)
-            else:
-                train_samples.append(sample)
-            cnt += 1
+            for train_index in train_indices:
+                train_path.append(img_list[train_index])
 
-        assert len(self.samples) == len(train_samples) + len(minival_samples)
+            for test_index in test_indices:
+                test_path.append(img_list[test_index])
 
-        if self.split == 'train' and self.is_minival:
-            self.samples = minival_samples
-        elif self.split == 'train' and not self.is_minival:
-            self.samples = train_samples
+        if split == 'train':
+            self.img_path = train_path
+        else:
+            self.img_path = test_path
 
         self.icosa_face_list = inflate_icosahedron(division_level=division_level)
         self.icosa_mapping_list = []
@@ -103,49 +90,21 @@ class ImageNet_Icosa_Dataset(ImageFolder):
             self.icosa_mapping_list.append((icosa_sampling_map_x, icosa_sampling_map_y))
 
 
-    @property
-    def split_folder(self) -> str:
-        return os.path.join(self.root, self.split)
-
     def __getitem__(self, idx):
 
-        path, target = self.samples[idx]
-        img = self.loader(path)
+        img = cv2.imread(self.img_path[idx])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        class_name = os.path.dirname(self.img_path[idx]).split('\\')[-1]
+        label = self.class_dict[class_name]
         img_np = np.array(img)
-        img_np = cv2.resize(img_np, (self.omni_h, self.omni_w))
-
-        fov_proj_map_x = self.fov_proj_map_x
-        fov_proj_map_y = self.fov_proj_map_y
-
-        undefined_zone = fov_proj_map_y == -1
-        OMNI_H, OMNI_W = fov_proj_map_x.shape
-        img_np = cv2.remap(img_np, fov_proj_map_x, fov_proj_map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
-        # [549, 549]
-        img_np[undefined_zone] = 0
-
-        # for erp projection sampling -> resize
-        img_np = cv2.resize(img_np, (self.omni_h * 3, self.omni_w * 3))  # [600, 600]
+        img_np = cv2.resize(img_np, (self.omni_h * 3, self.omni_w * 3))
 
         if self.rotate:
-            # get random index at training
-            if self.split == 'train':
-                rot_idx = np.random.randint(0, 50000)
-            # get fixed index at testing
-            elif self.split == 'val':
-                rot_idx = self.test_rot_idx[idx]
 
-            # -------------------------------------- choose one method for remap --------------------------------------
-            #  ################### 1) create rotation remap ###################
-
-            # R = rand_rotation_matrix()
-            # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
-            # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
-
-            #  ################### 2) load rotation remap ###################
+            rot_idx = np.random.randint(0, 50000)
             now_dir = os.getcwd()
 
             # for dataset test
-            # map_path_name = 'xy_maps_50000_mnist'  # 'xy_maps_50_50'
             map_path_name = r'D:\data\\xy_maps_50000_image_600'  # 'xy_maps_50_50'
             if 'datasets' in now_dir.split('\\'):
                 map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
@@ -178,7 +137,7 @@ class ImageNet_Icosa_Dataset(ImageFolder):
         patch_list = np.array(patch_list)
 
         if self.vis:
-            print("label : ", int(self.targets[idx]))
+            print("label : ", label)
             coordinates_vis = coordinates.reshape(20 * 4 ** self.division_level,
                                                   -1)  # [20 * 4 ** self.division_level, 3]
             cal_vis = patch_list.reshape(20 * 4 ** self.division_level, -1)  # [20 * 4 ** self.division_level, 1]
@@ -186,16 +145,15 @@ class ImageNet_Icosa_Dataset(ImageFolder):
 
         sequence_tensor = torch.from_numpy(patch_list).type(torch.float32).squeeze(-1)  # [20, 4 ** self.division_level]
         sequence_tensor = sequence_tensor.reshape(20, -1)
-        label = int(self.targets[idx])
         return sequence_tensor, label
 
-
     def __len__(self):
-        return len(self.samples)
+        return len(self.img_path)
 
 
 if __name__ == '__main__':
-    dataset = ImageNet_Icosa_Dataset(root='D:\data\ILSVRC_classification', split='val', rotate=True, vis=True)
+    dataset = Panoramic_Icosa_Dataset(root='D:\data\panorama_360', split='train', rotate=True, vis=True)
     print(len(dataset))
-    img, label = dataset.__getitem__(0)
-    print(img.shape)
+    for data in dataset:
+        print(data[0].size())
+        print(data[1])

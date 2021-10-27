@@ -212,7 +212,7 @@ class Cifar_Icosa_Dataset(Dataset):
             show_spheres(scale=2, points=coordinates_vis, rgb=cal_vis)
 
         sequence_tensor = torch.from_numpy(patch_list).type(torch.float32).squeeze(-1)  # [20, 4 ** self.division_level]
-        sequence_tensor = sequence_tensor.reshape(20, -1)
+        sequence_tensor = sequence_tensor.reshape(320, -1)
         label = int(self.targets[idx])
         return sequence_tensor, label
 
