@@ -1,7 +1,9 @@
-import torch
-import torch.nn as nn
+import os
 import time
+import torch
 import visdom
+import torch.nn as nn
+
 
 from thop.profile import profile
 
@@ -53,8 +55,8 @@ def main_wokrer():
     # test_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, num_edge=15)
 
     # ---------- icosahedron ----------
-    # train_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, division_level=3)
-    # test_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, division_level=3)
+    train_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, division_level=3)
+    test_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, division_level=3)
 
     ############################## CIFAR ##############################
     # ---------- erp ----------
@@ -66,8 +68,8 @@ def main_wokrer():
     # test_set = Cifar_Cube_Dataset(root='D:\data\CIFAR10', split='test', rotate=True, bandwidth=50, num_edge=29)
 
     # ---------- icosa ----------
-    train_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='train', bandwidth=50, division_level=4)
-    test_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='test', bandwidth=50, division_level=4)
+    # train_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='train', bandwidth=50, division_level=4)
+    # test_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='test', bandwidth=50, division_level=4)
 
     ############################## ImageNet ##############################
     # ---------- erp ----------
@@ -126,14 +128,14 @@ def main_wokrer():
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=58 * 58 * 3)
 
     # ---------- transformer for icosahedron ----------
-    # model = SPHTransformer(model_dim=24, num_patches=20, num_head=8,
-    #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=64)
+    model = SPHTransformer(model_dim=24, num_patches=20, num_head=8,
+                           num_layers=7, dropout=0.0, num_classes=10, input_dim=64)
 
     # model = SPHTransformer(model_dim=64, num_patches=20, num_head=8,
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=256 * 3)
 
-    model = SPHTransformer(model_dim=64, num_patches=320, num_head=8,
-                           num_layers=6, dropout=0.1, num_classes=10, input_dim=16 * 3)
+    # model = SPHTransformer(model_dim=64, num_patches=320, num_head=8,
+    #                        num_layers=6, dropout=0.1, num_classes=10, input_dim=16 * 3)
 
     # model = SPHTransformer(model_dim=128, num_patches=20, num_head=8,
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=1024 * 3)
@@ -191,6 +193,8 @@ def main_wokrer():
         val_loss = 0
         correct = 0
         total = 0
+        best_acc = 0
+
         for i, (images, labels) in enumerate(test_loader):
             model.eval()
 
@@ -211,6 +215,12 @@ def main_wokrer():
 
         print('Test Accuracy: {:.3f}'.format(100 * accuracy))
         print(accuracy)
+
+        # save if best accuracy
+        if best_acc < accuracy:
+            os.makedirs('./saves', exist_ok=True)
+            torch.save(obj=model.state_dict(), f='./saves/best_acc.pth.tar')
+            print('save params of accuracy {:.3f}'.format(accuracy * 100))
 
         if vis is not None:
             vis.line(X=torch.ones((1, 2)) * epoch,
