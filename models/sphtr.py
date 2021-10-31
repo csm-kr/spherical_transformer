@@ -145,11 +145,12 @@ class SPHTransformer(nn.Module):
         self.position_embedding = nn.Parameter(torch.empty(1, self.num_patches, self.model_dim))  # [1, N, D]
         torch.nn.init.normal_(self.position_embedding, std=.02)  # 확인해보기
 
+        self.dropout = nn.Dropout(dropout)
         self.encoder = Encoder(num_layers=num_layers, model_dim=model_dim, num_head=num_head, dropout=dropout)
         self.is_classify = is_classify
         if is_classify:
-            self.classifier = nn.Linear(self.num_patches * self.model_dim, num_classes)
-            # self.classifier = nn.Linear(self.num_patches, num_classes)
+            # self.classifier = nn.Linear(self.num_patches * self.model_dim, num_classes)
+            self.classifier = nn.Linear(self.num_patches, num_classes)
 
         print("num_params : ", self.count_parameters())
 
@@ -160,31 +161,91 @@ class SPHTransformer(nn.Module):
         batch_size = seq.size(0)
         x = self.patch_embedding_projection(seq)  # [B, 20, 64]  ->  [B, 20, model_dim]
         x += self.position_embedding  # (=E_pos)
+        x = self.dropout(x)
         x = self.encoder(x)
         if self.is_classify:
-            # x = torch.mean(x, dim=-1)   # [B, 25]
-            x = x.reshape([batch_size, self.model_dim * self.num_patches])
+            x = torch.mean(x, dim=-1)   # [B, 25]
+            # x = x.reshape([batch_size, self.model_dim * self.num_patches])
+            x = self.classifier(x)
+        return x
+
+
+
+class SPHTransformer_Classic(nn.Module):
+
+    def __init__(self, model_dim, num_patches, num_head=12, num_layers=12, dropout=0.1, num_classes=10, input_dim=64, is_classify=True):
+        super().__init__()
+
+        self.model_dim = model_dim
+        self.num_patches = num_patches
+        # number of patches (N)
+
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, self.model_dim))                              # [1, 1, D]
+        self.patch_embedding_projection = nn.Linear(input_dim, self.model_dim)
+
+        self.position_embedding = nn.Parameter(torch.empty(1, self.num_patches + 1, self.model_dim))  # [1, N + 1, D]
+        torch.nn.init.normal_(self.position_embedding, std=.02)  # 확인해보기
+
+        self.dropout = nn.Dropout(dropout)
+        self.encoder = Encoder(num_layers=num_layers, model_dim=model_dim, num_head=num_head, dropout=dropout)
+        self.is_classify = is_classify
+        if is_classify:
+            self.classifier = nn.Linear(self.model_dim, num_classes)
+
+        print("num_params : ", self.count_parameters())
+
+    def count_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    def forward(self, seq):
+        batch_size = seq.size(0)
+
+        x = self.patch_embedding_projection(seq)  # [B, 21, 64]  ->  [B, 21, model_dim]
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1)          # expand to [B, 1, D]
+        x = torch.cat((cls_tokens, x), dim=1)                           # [B, 1 + N, D]
+        x += self.position_embedding  # (=E_pos)
+        x = self.dropout(x)
+        x = self.encoder(x)
+        if self.is_classify:
+            x = x[:, 0]
             x = self.classifier(x)
         return x
 
 
 if __name__ == '__main__':
-    image = torch.randn([2, 20, 64]) # mnist icosahedron
-    vit = SPHTransformer(model_dim=24, num_patches=20, num_classes=10, num_head=8, num_layers=6, input_dim=64)
+
+    # params : 57418
+    image = torch.randn([2, 1280, 4 * 3])  # mnist icosahedron
+    vit = SPHTransformer(model_dim=24, num_patches=1280, num_classes=10, num_head=8, num_layers=7, input_dim=4)
     output = vit(image)
     print(output.size())
 
-    image = torch.randn([2, 20, 256 * 3])
-    vit = SPHTransformer(model_dim=64, num_patches=20, num_classes=10, num_head=8, num_layers=12, input_dim=256 * 3)
-    output = vit(image)
-    print(output.size())
+    # vit_classic = SPHTransformer_Classic(model_dim=24, num_patches=20, num_classes=10, num_head=8, num_layers=7, input_dim=64)
+    # output = vit_classic(image)
+    # print(output.size())
 
-    image = torch.randn([2, 6, 225])
-    vit = SPHTransformer(model_dim=24, num_patches=6, num_classes=10, num_head=8, num_layers=6, input_dim=225)
-    output = vit(image)
-    print(output.size())
+    # # params : 59946
+    # image = torch.randn([2, 20, 64])  # mnist icosahedron
+    # vit = SPHTransformer(model_dim=32, num_patches=20, num_classes=10, num_head=8, num_layers=4, input_dim=64)
+    # output = vit(image)
+    # print(output.size())
 
-    image = torch.randn([2, 6, 841 * 3])
-    vit = SPHTransformer(model_dim=64, num_patches=6, num_classes=10, num_head=8, num_layers=12, input_dim=841 * 3)
-    output = vit(image)
-    print(output.size())
+    # image = torch.randn([2, 20, 256 * 3])
+    # vit = SPHTransformer(model_dim=64, num_patches=20, num_classes=10, num_head=8, num_layers=12, input_dim=256 * 3)
+    # output = vit(image)
+    # print(output.size())
+    #
+    # image = torch.randn([2, 20, 256 * 3])
+    # vit = SPHTransformer(model_dim=64, num_patches=20, num_classes=10, num_head=8, num_layers=12, input_dim=256 * 3)
+    # output = vit(image)
+    # print(output.size())
+    #
+    # image = torch.randn([2, 6, 225])
+    # vit = SPHTransformer(model_dim=24, num_patches=6, num_classes=10, num_head=8, num_layers=6, input_dim=225)
+    # output = vit(image)
+    # print(output.size())
+    #
+    # image = torch.randn([2, 6, 841 * 3])
+    # vit = SPHTransformer(model_dim=64, num_patches=6, num_classes=10, num_head=8, num_layers=12, input_dim=841 * 3)
+    # output = vit(image)
+    # print(output.size())

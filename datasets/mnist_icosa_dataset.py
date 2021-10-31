@@ -94,28 +94,30 @@ class Mnist_Icosa_Dataset(Dataset):
 
             # -------------------------------------- choose one method for remap --------------------------------------
             #  ################### 1) create rotation remap ###################
-
-            # R = rand_rotation_matrix()
-            # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
-            # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+            # if self.split == 'train':
+            #
+            #     R = rand_rotation_matrix()
+            #     map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
+            #     img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
             #  ################### 2) load rotation remap ###################
-            now_dir = os.getcwd()
+            if self.split == 'test' or self.split == 'train':
+                now_dir = os.getcwd()
 
-            # for dataset test
-            map_path_name = 'xy_maps_50000_mnist'  # 'xy_maps_50_50'
-            if 'datasets' in now_dir.split('\\'):
-                map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
-            # for main
-            else:
-                map_matrix_dir = os.path.join(now_dir, map_path_name)
+                # for dataset test
+                map_path_name = 'xy_maps_50000_mnist'  # 'xy_maps_50_50'
+                if 'datasets' in now_dir.split('\\'):
+                    map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+                # for main
+                else:
+                    map_matrix_dir = os.path.join(now_dir, map_path_name)
 
-            map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
-            map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
+                map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
+                map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
 
-            map_x = np.load(map_x_path)
-            map_y = np.load(map_y_path)
-            img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+                map_x = np.load(map_x_path)
+                map_y = np.load(map_y_path)
+                img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
         equi = img_np
         rotated_equi = equi

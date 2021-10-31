@@ -11,11 +11,10 @@ from samplings.icosahedron_sampling import inflate_icosahedron
 from utils.visualization_util import show_spheres, grid_2_points
 from utils.download_util import download_cifar10, check_integrity
 from utils.projection_util import get_projection_grid, rotate_grid, cartesian_to_spherical, spherical_to_plane
-from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
+from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R, rand_rotation_matrix
 
 
 class Cifar_Icosa_Dataset(Dataset):
-
 
     train_list = [
         ['data_batch_1', 'c99cafc152244af753f735de768cd75f'],
@@ -170,23 +169,24 @@ class Cifar_Icosa_Dataset(Dataset):
             # map_x, map_y = rotate_map_given_R(R, self.omni_h, self.omni_w)
             # img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
+            if self.split == 'test' and self.split == 'test':
             #  ################### 2) load rotation remap ###################
-            now_dir = os.getcwd()
+                now_dir = os.getcwd()
 
-            # for dataset test
-            map_path_name = 'xy_maps_50000_cifar'  # 'xy_maps_50_50'
-            if 'datasets' in now_dir.split('\\'):
-                map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
-            # for main
-            else:
-                map_matrix_dir = os.path.join(now_dir, map_path_name)
+                # for dataset test
+                map_path_name = 'xy_maps_50000_cifar'  # 'xy_maps_50_50'
+                if 'datasets' in now_dir.split('\\'):
+                    map_matrix_dir = os.path.join(os.path.split(now_dir)[0], map_path_name)
+                # for main
+                else:
+                    map_matrix_dir = os.path.join(now_dir, map_path_name)
 
-            map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
-            map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
+                map_x_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_x.npy'
+                map_y_path = map_matrix_dir + '/' + str('%05d' % rot_idx) + '_y.npy'
 
-            map_x = np.load(map_x_path)
-            map_y = np.load(map_y_path)
-            img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+                map_x = np.load(map_x_path)
+                map_y = np.load(map_y_path)
+                img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
 
         equi = img_np
         rotated_equi = equi
@@ -212,7 +212,7 @@ class Cifar_Icosa_Dataset(Dataset):
             show_spheres(scale=2, points=coordinates_vis, rgb=cal_vis)
 
         sequence_tensor = torch.from_numpy(patch_list).type(torch.float32).squeeze(-1)  # [20, 4 ** self.division_level]
-        sequence_tensor = sequence_tensor.reshape(320, -1)
+        sequence_tensor = sequence_tensor.reshape(1280, -1)
         label = int(self.targets[idx])
         return sequence_tensor, label
 

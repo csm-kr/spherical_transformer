@@ -10,6 +10,9 @@ from utils.visualization_util import show_spheres, grid_2_points
 from utils.projection_util import get_projection_grid, rotate_grid, make_fov_projection_map
 from utils.rotation_util import calculate_Rmatrix_from_phi_theta, rotate_map_given_R
 
+from datasets.cupy_map_coordinates import cupy_remap
+
+import time
 
 class ImageNet_ERP_Dataset(ImageFolder):
 
@@ -29,6 +32,7 @@ class ImageNet_ERP_Dataset(ImageFolder):
         self.is_minival = is_minival
         self.rotate = rotate
         self.vis = vis
+        self.use_cupy = True
 
         wnid_to_classes = load_meta_file(self.root)[0]
 
@@ -115,11 +119,25 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
         undefined_zone = fov_proj_map_y == -1
         OMNI_H, OMNI_W = fov_proj_map_x.shape
-        img_np = cv2.remap(img_np, fov_proj_map_x, fov_proj_map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)   # [600, 600]
+        times = 0
+
+        if self.use_cupy:
+            tic = time.time()
+            img_np, cuda_time = cupy_remap(img_np, fov_proj_map_x, fov_proj_map_y)
+            # times += time.time() - tic
+            times += cuda_time
+        else:
+            tic = time.time()
+            img_np = cv2.remap(img_np, fov_proj_map_x, fov_proj_map_y,
+                               cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)   # [600, 600]
+            times += time.time() - tic
         img_np[undefined_zone] = 0
 
         # for erp projection sampling -> resize
         img_np = cv2.resize(img_np, (self.omni_h * 3, self.omni_w * 3))
+        # cv2.imshow('input', img_np)
+        # cv2.waitKey(0)
+
 
         if self.rotate:
             # get random index at training
@@ -153,10 +171,32 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
             map_x = np.load(map_x_path)
             map_y = np.load(map_y_path)
-            img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+
+            # tic = time.time()
+            if self.use_cupy:
+                tic = time.time()
+                img_np, cuda_time = cupy_remap(img_np, map_x, map_y)
+                # times += time.time() - tic
+                times += cuda_time
+            else:
+                tic = time.time()
+                img_np = cv2.remap(img_np, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_TRANSPARENT)
+                times += time.time() - tic
+            # # 0.0029921531677246094
+            # print(time.time() - tic)
+            # cv2.imshow('input0', img_np)
+
+            # tic = time.time()
+            # img_np = cupy_remap(img_np, map_x, map_y)  # 0.9654207229614258
+            # print(time.time() - tic)
+            #
+            # cv2.imshow('input1', img_np)
+            # cv2.waitKey(0)
 
         # add last channel axis
         img_np = cv2.resize(img_np, (self.bandwidth * 2, self.bandwidth))
+        # cv2.imshow('input', img_np)
+        # cv2.waitKey(0)
 
         if self.vis:
 
@@ -172,7 +212,7 @@ class ImageNet_ERP_Dataset(ImageFolder):
 
         img_np = np.transpose(img_np, (2, 0, 1)).astype(np.float32) / 255          # [0 ~ 1]
         img_torch = torch.FloatTensor(img_np)                   # [1, 60, 60]
-
+        print(times)
         label = int(self.targets[idx])
         return img_torch, label
 

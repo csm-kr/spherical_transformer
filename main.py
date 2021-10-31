@@ -3,6 +3,7 @@ import time
 import torch
 import visdom
 import torch.nn as nn
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 from thop.profile import profile
@@ -29,6 +30,7 @@ from datasets.panoramic_cube_dataset import Panoramic_Cube_Dataset
 
 from torch.utils.data import DataLoader
 from models.sphtr import SPHTransformer
+from models.sphtr import SPHTransformer_Classic
 from models.sphtr_erp import SPHTransformer_ERP
 from models.cnn import ConvNet
 
@@ -41,7 +43,7 @@ LEARNING_RATE = 1e-3
 
 def main_wokrer():
 
-    vis = visdom.Visdom(port='8097')
+    vis = visdom.Visdom(port='2025')
 
     # R / R  - rotate True True
 
@@ -55,8 +57,8 @@ def main_wokrer():
     # test_set = Mnist_Cube_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, num_edge=15)
 
     # ---------- icosahedron ----------
-    train_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, division_level=3)
-    test_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, division_level=3)
+    # train_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='train', rotate=True,  bandwidth=25, division_level=3)
+    # test_set = Mnist_Icosa_Dataset(root='D:\data\MNIST', split='test', rotate=True,  bandwidth=25, division_level=3)
 
     ############################## CIFAR ##############################
     # ---------- erp ----------
@@ -68,8 +70,8 @@ def main_wokrer():
     # test_set = Cifar_Cube_Dataset(root='D:\data\CIFAR10', split='test', rotate=True, bandwidth=50, num_edge=29)
 
     # ---------- icosa ----------
-    # train_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='train', bandwidth=50, division_level=4)
-    # test_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='test', bandwidth=50, division_level=4)
+    train_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='train', bandwidth=50, division_level=4)
+    test_set = Cifar_Icosa_Dataset(root='D:\data\CIFAR10', split='test', bandwidth=50, division_level=4)
 
     ############################## ImageNet ##############################
     # ---------- erp ----------
@@ -113,8 +115,9 @@ def main_wokrer():
     #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50)
     # model = SPHTransformer_ERP(model_dim=64, num_patches=100, num_head=8,
     #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50 * 3)
+
     # model = SPHTransformer_ERP(model_dim=128, num_patches=100, num_head=8,
-    #                            num_layers=6, dropout=0.0, num_classes=10, input_dim=50 * 3)
+    #                            num_layers=6, dropout=0.0, num_classes=1000, input_dim=50 * 3)
 
     # ---------- transformer for cube ----------
 
@@ -128,8 +131,14 @@ def main_wokrer():
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=58 * 58 * 3)
 
     # ---------- transformer for icosahedron ----------
-    model = SPHTransformer(model_dim=24, num_patches=20, num_head=8,
-                           num_layers=7, dropout=0.0, num_classes=10, input_dim=64)
+    model = SPHTransformer(model_dim=16, num_patches=1280, num_head=8,
+                           num_layers=7, dropout=0.0, num_classes=10, input_dim=4 * 3)
+
+    # model = SPHTransformer_Classic(model_dim=24, num_patches=20, num_head=8,
+    #                                num_layers=7, dropout=0.0, num_classes=10, input_dim=64)
+
+    # model = SPHTransformer_Classic(model_dim=24, num_patches=320, num_head=8,
+    #                                num_layers=7, dropout=0.0, num_classes=10, input_dim=16 * 3)
 
     # model = SPHTransformer(model_dim=64, num_patches=20, num_head=8,
     #                        num_layers=6, dropout=0.0, num_classes=10, input_dim=256 * 3)
@@ -148,6 +157,8 @@ def main_wokrer():
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=LEARNING_RATE)
+
+    scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=NUM_EPOCHS)
 
     for epoch in range(NUM_EPOCHS):
         # 8. train
@@ -220,7 +231,7 @@ def main_wokrer():
         if best_acc < accuracy:
             os.makedirs('./saves', exist_ok=True)
             torch.save(obj=model.state_dict(), f='./saves/best_acc.pth.tar')
-            print('save params of accuracy {:.3f}'.format(accuracy * 100))
+            # print('save params of accuracy {:.3f}'.format(accuracy * 100))
 
         if vis is not None:
             vis.line(X=torch.ones((1, 2)) * epoch,
@@ -231,6 +242,8 @@ def main_wokrer():
                                y_label='test_loss and acc',
                                title='test_loss and accuracy',
                                legend=['accuracy', 'avg_loss']))
+
+        scheduler.step()
 
 
 if __name__ == '__main__':
